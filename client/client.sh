@@ -1,0 +1,1 @@
+# This file is where we will write the script to run the prometheus server 
