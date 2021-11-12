@@ -1,7 +1,0 @@
-GET /metrics HTTP/1.1
-Host: localhost:7380
-User-Agent: Prometheus/2.31.1
-Accept: application/openmetrics-text; version=0.0.1,text/plain;version=0.0.4;q=0.5,*/*;q=0.1
-Accept-Encoding: gzip
-X-Prometheus-Scrape-Timeout-Seconds: 10
-
