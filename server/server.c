@@ -23,7 +23,7 @@ int main(int argc, char* argv[]){
     
     int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes;
     char receive_buffer[4096];
-    char header[4096] = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\n\r\n";
+    char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\n\r\n";
     char body[4096] = "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n";
     char send_buffer[4096];
     char send_buffer2[4096];
@@ -54,18 +54,19 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
+    connecting = listen(sockfd, num_connections);
+
+    if (connecting < 0) {
+	printf("FAILED: Listen failed!");
+	close(sockfd);
+	return -1;
+    }
+
+
     while(1) {
 
 	struct sockaddr_storage client_addr;
     	socklen_t client_addr_size;
-
-    	connecting = listen(sockfd, num_connections);
-
-    	if (connecting < 0) {
-		printf("FAILED: Listen failed!");
-		close(sockfd);
-		return -1;
-    	}
 
     	newfd = accept(sockfd, (struct sockaddr *restrict)&client_addr, (socklen_t *restrict)&client_addr_size);
 
@@ -88,27 +89,13 @@ int main(int argc, char* argv[]){
 	}
 
 	memset((void*)send_buffer, 0, sizeof(send_buffer));
-	memset((void*)send_buffer2, 0, sizeof(send_buffer2));
-
-	strcpy(send_buffer, body);
-	strcpy(send_buffer2, header);
-
-	z_stream zs;
-	zs.zalloc = Z_NULL;
-	zs.zfree = Z_NULL;
-	zs.opaque = Z_NULL;
-	zs.avail_in = (uInt)sizeof(send_buffer);
-	zs.next_in = (Bytef *)send_buffer;
-	zs.avail_out = (uInt)(sizeof(send_buffer2) - strlen(send_buffer2));
-	zs.next_out = (Bytef *)(send_buffer2+strlen(send_buffer2));
-	deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 | 16, 8, Z_DEFAULT_STRATEGY);
-	deflate(&zs, Z_FINISH);
-	deflateEnd(&zs); 
 	
+	strcpy(send_buffer, header);
+	strcat(send_buffer, body);
 
 	total_bytes = 0;
-	while (total_bytes != sizeof(send_buffer2)) {
-		num_bytes = send(newfd, send_buffer2+total_bytes, sizeof(send_buffer2) - total_bytes, 0);
+	while (total_bytes != strlen(send_buffer)) {
+		num_bytes = send(newfd, send_buffer+total_bytes, strlen(send_buffer) - total_bytes, 0);
 
 		if (num_bytes < 0) {
 			printf("FAILED: Send failed!");
@@ -118,7 +105,9 @@ int main(int argc, char* argv[]){
 		}
 		total_bytes += num_bytes;
 	}
+	
 	printf("One connection handled!\n");
+	close(newfd);
 	
     }
 
