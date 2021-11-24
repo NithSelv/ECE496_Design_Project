@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <zlib.h>
 
 void setup_server_struct(struct sockaddr_in* addr, int port) {
     addr->sin_family = AF_INET;
@@ -20,12 +21,13 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
 
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes;
+    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes;
     char receive_buffer[4096];
+    char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\n\r\n";
+    char body[4096] = "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n";
+    char send_buffer[4096];
+    char send_buffer2[4096];
     struct sockaddr_in server_addr;
-    struct sockaddr_storage client_addr;
-    socklen_t client_addr_size;
-    FILE* fp = NULL;
 
     if (argc != 3) {
         printf("FAILED: Not enough arguments\n");
@@ -52,28 +54,28 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
-    fp = fopen("./temp.txt", "wb");
+    connecting = listen(sockfd, num_connections);
+
+    if (connecting < 0) {
+	printf("FAILED: Listen failed!");
+	close(sockfd);
+	return -1;
+    }
+
 
     while(1) {
 
-    	connecting = listen(sockfd, num_connections);
-
-    	if (connecting < 0) {
-		printf("FAILED: Listen failed!");
-		close(sockfd);
-		fclose(fp);
-		return -1;
-    	}
+	struct sockaddr_storage client_addr;
+    	socklen_t client_addr_size;
 
     	newfd = accept(sockfd, (struct sockaddr *restrict)&client_addr, (socklen_t *restrict)&client_addr_size);
 
-	if (newfd < 0) {
+    	if (newfd < 0) {
 		printf("FAILED: Accept failed!");
 		close(newfd);
 		close(sockfd);
-		fclose(fp);
 		return -1;
-	}
+    	}
 
 	memset((void*)receive_buffer, 0, sizeof(receive_buffer));
 	num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);
@@ -83,21 +85,35 @@ int main(int argc, char* argv[]){
 		perror("THis is the error: ");
 		close(newfd);
 		close(sockfd);
-		fclose(fp);
 		return -1;
 	}
 
-	while (num_bytes > 0) {
-		fwrite((const void*)receive_buffer, num_bytes, 1, fp);
-		memset((void*)receive_buffer, 0, sizeof(receive_buffer));
-		num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);		
-	}
+	memset((void*)send_buffer, 0, sizeof(send_buffer));
+	
+	strcpy(send_buffer, header);
+	strcat(send_buffer, body);
 
+	total_bytes = 0;
+	while (total_bytes != strlen(send_buffer)) {
+		num_bytes = send(newfd, send_buffer+total_bytes, strlen(send_buffer) - total_bytes, 0);
+
+		if (num_bytes < 0) {
+			printf("FAILED: Send failed!");
+			close(newfd);
+			close(sockfd);
+			return -1;
+		}
+		total_bytes += num_bytes;
+	}
+	
+	printf("One connection handled!\n");
 	close(newfd);
-	close(sockfd);	
-	fclose(fp);	
-	return 0;
+	
     }
+
+    close(newfd);
+    close(sockfd);		
+    return 0;
 }
 
 
