@@ -1,7 +1,7 @@
-CC=gcc
+CC=g++
 all:
-	gcc -Wall -g -o server server.c -lz   	
+	g++ -Wall -g -o server server.cpp   	
 server:
-	gcc -Wall -g -o server server.c -lz
+	g++ -Wall -g -o server server.cpp
 clean:
 	rm -f *.o server 
