@@ -449,22 +449,22 @@ class Http_Response {
 	}
 };
 
-int http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num) {
-    char* client = req->Find("User-Agent");
+char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num, char* body) {
+    char* client = (*req).Find("User-Agent");
     if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
         printf("Unauthorized Client!\n");
-	rep->Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
-	return -1;
+	(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
+	return (*rep).Prepare_Http_Response();
     } 
 
-    char* type = req->Find("Type");
-    char* metric = req->Find("Metric");
-    char* ip = req->Find("Host");
+    char* type = (*req).Find("Type");
+    char* metric = (*req).Find("Metric");
+    char* ip = (*req).Find("Host");
 
     if (ip == NULL) {
 	printf("Invalid Request!\n");
-	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
-	return -1;	
+	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return (*rep).Prepare_Http_Response();	
     }
 
     char* port_s = strtok(ip, ":");
@@ -473,41 +473,39 @@ int http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db
 
     if ((type == NULL) || (metric == NULL) || (host == NULL) || (port_s == NULL)) {
 	printf("Invalid Request!\n");		
-	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
-	return -1;
+	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return (*rep).Prepare_Http_Response();
     } 
 
     if (strncmp(type, "GET", 3) != 0){
 	printf("Invalid Request!\n");		
-	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
-	return -1;
+	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return (*rep).Prepare_Http_Response();
     }
 
     if (strncmp(metric, "/metrics", 8) != 0) {
 	printf("Not Found!\n");		
-	rep->Add_Field("Header", "HTTP/1.1 404 Not Found");
-	return -1;
+	(*rep).Add_Field("Header", "HTTP/1.1 404 Not Found");
+	return (*rep).Prepare_Http_Response();
     }
 
     if ((strncmp(host, "localhost", 9) != 0) && (strncmp(port_s, port_num, strlen(port_num)) != 0)) {
 	printf("Wrong server or port!\n");		
-	rep->Add_Field("Header", "HTTP/1.1 303 See Other");
-	return -1;
+	(*rep).Add_Field("Header", "HTTP/1.1 303 See Other");
+	return (*rep).Prepare_Http_Response();
     }
 
     printf("Valid Request Received!\n");
-    rep->Add_Field("Header", "HTTP/1.1 200 OK");
-    rep->Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    char * body = db->Prepare_All_Metrics_Body();
-    rep->Add_Field("Body", body);
-    delete body;
-    body = NULL;
-    return 0;
+    (*rep).Add_Field("Header", "HTTP/1.1 200 OK");
+    (*rep).Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    body = db->Prepare_All_Metrics_Body();
+    (*rep).Add_Field("Body", body);
+    return (*rep).Prepare_Http_Response();
 }
 
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, timeout, db_check, sock_check, http_check;
+    int port, num_connections, sockfd, newfd, bound, connecting, timeout, db_check, sock_check;
     char port_num[100] = "";
     double start_time = 0;
     char receive_buffer[4096];
@@ -603,18 +601,18 @@ int main(int argc, char* argv[]){
 
 	req.Parse(receive_buffer);
 
-	http_check = http_error_check(&req, &rep, &db, port_num);
+	char* body;
+
+	char * http_rep = http_error_check(&req, &rep, &db, port_num, body);
 
 	req.Print();
 	printf("\n");
 	rep.Print();
 
-	char* temp = rep.Prepare_Http_Response();
-
 	int total_bytes = 0;
     	num_bytes = 0;
     	memset((void*)send_buffer, 0, sizeof(send_buffer));
-    	strcpy(send_buffer, temp);
+    	strcpy(send_buffer, http_rep);
 
 	printf("%s\n", send_buffer);
 
@@ -628,6 +626,10 @@ int main(int argc, char* argv[]){
 	    }
 	    total_bytes += num_bytes;
         }
+
+	delete body;
+	body = NULL;
+	http_rep = NULL;
 
 	db_check = populate_database(&db, start_time);
 	if (db_check < 0) {
