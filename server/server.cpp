@@ -206,19 +206,20 @@ class Http_Response {
 
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes;
+    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes, timeout;
     //char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\n\r\n";
     //char body[4096] = "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n";
     char receive_buffer[4096];
     char send_buffer[4096];
     struct sockaddr_in server_addr;
 
-    if (argc != 3) {
+    if (argc != 4) {
         printf("FAILED: Not enough arguments\n");
         return -1;
     } else {
         port = atoi(argv[1]);
 	num_connections = atoi(argv[2]);
+	timeout = atoi(argv[3]);
     }
 
     setup_server_struct(&server_addr, port);
@@ -260,12 +261,23 @@ int main(int argc, char* argv[]){
 		return -1;
     	}
 
+	struct timeval timer;
+	timer.tv_sec = 0;
+	timer.tv_usec = timeout;
+	int time_set = setsockopt(newfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timer, sizeof(timer));
+
+        if (time_set < 0) {
+        	printf("FAILED: Could not set timeout!\n");
+		close(newfd);
+		close(sockfd);
+		return -1;
+	}
+
 	memset((void*)receive_buffer, 0, sizeof(receive_buffer));
 	num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);
 
 	if (num_bytes < 0) {
 		printf("FAILED: Receive failed!");
-		perror("THis is the error: ");
 		close(newfd);
 		close(sockfd);
 		return -1;
