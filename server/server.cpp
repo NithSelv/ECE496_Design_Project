@@ -22,6 +22,23 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
     return;
 }
 
+int send_msg(int* sock, char* buffer, char* msg) {
+    int total_bytes = 0;
+    int num_bytes = 0;
+    memset((void*)buffer, 0, sizeof(buffer));
+    strcpy(buffer, msg);
+    while (total_bytes != (int)strlen(buffer)) {
+        num_bytes = send(*sock, buffer+total_bytes, strlen(buffer) - total_bytes, 0);
+	if (num_bytes < 0) {
+		printf("FAILED: Send failed!");
+		close(*sock);
+		return -1;
+	}
+	total_bytes += num_bytes;
+    }
+    return 0;
+}
+
 struct Node {
     char * field;
     char * value;
@@ -195,42 +212,38 @@ class Metrics_Database {
 int initialize_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char* data = new char[4096];
+    char data[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
     if (ret == 0) {
 	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-	sprintf(data, "%f", cpu_time);
+	sprintf(data, "%lf\0", cpu_time);
     	db->Add_Metric("User CPU Time (Seconds)", data);
 	memset((void*)data, 0, sizeof(data));
 	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-	sprintf(data, "%f", calendar_time);
+	sprintf(data, "%lf\0", calendar_time);
 	db->Add_Metric("Calendar Time (Seconds)", data);
     }
-    delete[] data;
-    data = NULL;
     return ret;
 }
 
 int populate_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char* data = new char[4096];
+    char data[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
     if (ret == 0) {
 	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-	sprintf(data, "%f", cpu_time);
+	sprintf(data, "%lf\0", cpu_time);
     	db->Set_Metric("User CPU Time (Seconds)", data);
 	memset((void*)data, 0, sizeof(data));
 	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-	sprintf(data, "%f", calendar_time);
+	sprintf(data, "%lf\0", calendar_time);
 	db->Set_Metric("Calendar Time (Seconds)", data);
     }
-    delete[] data;
-    data = NULL;
     return ret;
 }
 
@@ -259,9 +272,37 @@ class Http_Request {
 	    strncpy(this->data.field, "Request", strlen("Request"));
 	    strncpy(this->data.value, req, num_chars);
 
-	    starter += (num_chars + 2);
-
 	    Node* node = &(this->data);
+
+	    char* arg = strtok(this->data.value, " ");
+	    int i = 0;
+	    while (arg != NULL) {
+		if (i == 3) {
+		    break;
+		}
+		node->next = new Node();
+		node = node->next;
+		node->field = NULL;
+	    	node->value = NULL;
+		node->next = NULL;
+		if (i == 0) {
+		    
+		    node->field = (char *)malloc(sizeof(char) * (strlen("Type") + 1));
+		    strcpy(node->field, "Type");
+		} else if (i == 1) {
+	 	    node->field = (char *)malloc(sizeof(char) * (strlen("Metric") + 1));
+		    strcpy(node->field, "Metric");
+		} else if (i == 2) {
+		    node->field = (char *)malloc(sizeof(char) * (strlen("Version") + 1));
+		    strcpy(node->field, "Version");
+		}
+	    	node->value = (char *)malloc(sizeof(char) * (strlen(arg) + 1));
+		strcpy(node->value, arg);
+		arg = strtok(NULL, " ");
+		i = i + 1;
+	    }
+
+	    starter += (num_chars + 2);
 
 	    while (starter != (last_line+2)) {
 		num_chars = strcspn(starter, "\r");
@@ -281,6 +322,7 @@ class Http_Request {
 		strncpy(node->value, starter+num_field_chars+2, num_chars - num_field_chars - 2);
 		node->field[num_field_chars] = '\0';
 		node->value[num_chars - num_field_chars - 2] = '\0';
+		
 		starter += (num_chars + 2);
 	    }
 	}
@@ -375,6 +417,7 @@ class Http_Response {
 	    Node* current = &(this->data);
 	    this->send_buffer = (char *)malloc(sizeof(char) * (this->buffer_size + 1));
 	    memset((void*)this->send_buffer, 0, sizeof(this->send_buffer));
+	    int ending = 0;
 	    while (current != NULL) {
 		if (strcmp(current->field, "Header") == 0) {
 		    strcpy(this->send_buffer, current->value);
@@ -387,8 +430,9 @@ class Http_Response {
 		    strcat(this->send_buffer, current->value);
 		    strcat(this->send_buffer, "\r\n");
 		}
-		if ((current->next != NULL) && (strcmp(current->next->field, "Body") == 0)) {
+		if (((current->next != NULL) && (strcmp(current->next->field, "Body") == 0)) || ((current->next == NULL) && (ending == 0))) {
 		    strcat(this->send_buffer, "\r\n");
+		    ending = 1;
 		}
 		current = current->next;
 	    }
@@ -420,9 +464,66 @@ class Http_Response {
 	}
 };
 
+int http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num) {
+    char* client = req->Find("User-Agent");
+    if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+        printf("Unauthorized Client!\n");
+	rep->Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
+	return -1;
+    } 
+
+    char* type = req->Find("Type");
+    char* metric = req->Find("Metric");
+    char* ip = req->Find("Host");
+
+    if (ip == NULL) {
+	printf("Invalid Request!\n");
+	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return -1;	
+    }
+
+    char* port_s = strtok(ip, ":");
+    char* host = port_s;
+    port_s = strtok(NULL, ":");
+
+    if ((type == NULL) || (metric == NULL) || (host == NULL) || (port_s == NULL)) {
+	printf("Invalid Request!\n");		
+	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return -1;
+    } 
+
+    if (strncmp(type, "GET", 3) != 0){
+	printf("Invalid Request!\n");		
+	rep->Add_Field("Header", "HTTP/1.1 400 Bad Request");
+	return -1;
+    }
+
+    if (strncmp(metric, "/metrics", 8) != 0) {
+	printf("Not Found!\n");		
+	rep->Add_Field("Header", "HTTP/1.1 404 Not Found");
+	return -1;
+    }
+
+    if ((strncmp(host, "localhost", 9) != 0) && (strncmp(port_s, port_num, strlen(port_num)) != 0)) {
+	printf("Wrong server or port!\n");		
+	rep->Add_Field("Header", "HTTP/1.1 303 See Other");
+	return -1;
+    }
+
+    printf("Valid Request Received!\n");
+    rep->Add_Field("Header", "HTTP/1.1 200 OK");
+    rep->Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    char * body = db->Prepare_All_Metrics_Body();
+    rep->Add_Field("Body", body);
+    delete body;
+    body = NULL;
+    return 0;
+}
+
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes, timeout, db_check;
+    int port, num_connections, sockfd, newfd, bound, connecting, timeout, db_check, sock_check, http_check;
+    char port_num[100] = "";
     double start_time = 0;
     char receive_buffer[4096];
     char send_buffer[4096];
@@ -442,6 +543,7 @@ int main(int argc, char* argv[]){
         printf("FAILED: Not enough arguments\n");
         return -1;
     } else {
+	strcpy(port_num, argv[1]);
         port = atoi(argv[1]);
 	num_connections = atoi(argv[2]);
 	timeout = atoi(argv[3]);
@@ -489,7 +591,6 @@ int main(int argc, char* argv[]){
 
 	struct timeval timer;
 	timer.tv_sec = timeout;
-	timer.tv_usec = 0;
 	int time_set = setsockopt(newfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timer, sizeof(timer));
 
         if (time_set < 0) {
@@ -499,66 +600,39 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-	memset((void*)receive_buffer, 0, sizeof(receive_buffer));
-	num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);
-
-	if ((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
-		printf("TIMEDOUT: Server timeout waiting for packet. Connection closed.\n");
-		close(newfd);
-		continue;
-	} else if (num_bytes < 0) {
-		printf("FAILED: Receive failed!");
-		close(newfd);
-		close(sockfd);
-		return -1;
-	}
+	int num_bytes = 0;
+    	memset((void*)receive_buffer, 0, sizeof(receive_buffer));
+    	num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);
+    	if ((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
+	    close(newfd);
+	    continue;
+    	} else if (num_bytes < 0) {
+	    printf("FAILED: Receive failed!");
+	    close(newfd);
+	    close(sockfd);
+	    return -1;
+        }
 
 	Http_Request req;
-	req.Parse(receive_buffer);
-	char* client = req.Find("User-Agent");
-	if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
-		printf("Unknown client attempted to connect!\n");
-		req.Print();	
-		close(newfd);
-		client = NULL;
-		continue;
-	}
-
-	//char* request = req.Find("Request");
-
-	//if (request == NULL) {
-		//printf("Invalid Request!\n");		
-		//close(newfd);
-		//continue;
-	//}
-	req.Print();
-
 	Http_Response rep;
-	rep.Add_Field("Header", "HTTP/1.1 200 OK");
-	rep.Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-	char* body = db.Prepare_All_Metrics_Body();
-	rep.Add_Field("Body", body);
-	char* temp = rep.Prepare_Http_Response();
-	delete body;
-	body = NULL;
+
+	req.Parse(receive_buffer);
+
+	http_check = http_error_check(&req, &rep, &db, port_num);
+
+	req.Print();
+	printf("\n");
 	rep.Print();
 
-	memset((void*)send_buffer, 0, sizeof(send_buffer));
-	strcpy(send_buffer, temp);
-	temp = NULL;
+	char* temp = rep.Prepare_Http_Response();
 
-	total_bytes = 0;
-	while (total_bytes != (int)strlen(send_buffer)) {
-		num_bytes = send(newfd, send_buffer+total_bytes, strlen(send_buffer) - total_bytes, 0);
-
-		if (num_bytes < 0) {
-			printf("FAILED: Send failed!");
-			close(newfd);
-			close(sockfd);
-			return -1;
-		}
-		total_bytes += num_bytes;
+	sock_check = send_msg(&newfd, send_buffer, temp);
+	if (sock_check == -1) {
+	    close(sockfd);
+	    return -1;
 	}
+
+	temp = NULL;
 
 	db_check = populate_database(&db, start_time);
 	if (db_check < 0) {
