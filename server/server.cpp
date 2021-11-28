@@ -242,10 +242,9 @@ class Http_Request {
 	}
 
 	void Parse(char* req) {
-	    char* line = strstr(req, "\r\n");
+	    int num_chars = strcspn(req, "\r");
+	    char* starter = req;
 	    char* last_line = strstr(req, "\r\n\r\n");
-	    int num_chars = (line - req);
-	    int increment = 0;
 
 	    this->data.field = (char *)malloc(sizeof(char) * (strlen("Request") + 1));
 	    this->data.value = (char *)malloc(sizeof(char) * (num_chars + 1));
@@ -257,33 +256,28 @@ class Http_Request {
 	    strncpy(this->data.field, "Request", strlen("Request"));
 	    strncpy(this->data.value, req, num_chars);
 
-	    increment += num_chars + 2;
-	    
-	    line = strstr(req+increment, "\r\n");
+	    starter += (num_chars + 2);
 
 	    Node* node = &(this->data);
-	    node->next = NULL;
 
-	    while (line != last_line) {
-		num_chars = line - (req+increment);
+	    while (starter != (last_line+2)) {
+		num_chars = strcspn(starter, "\r");
 		node->next = new Node();
 		node = node->next;
 		node->next = NULL;
 		node->field = NULL;
 		node->value = NULL;
-		char* field = strstr(req+increment, ": ");
-		int num_field_chars = field - (req+increment);
+		int num_field_chars = strcspn(starter, ":");
 		node->field = (char *)malloc(sizeof(char) * (num_field_chars + 1));
 		node->value = (char *)malloc(sizeof(char) * (num_chars - num_field_chars));
 		
 		memset((void*)node->field, 0, sizeof(node->field));
 		memset((void*)node->value, 0, sizeof(node->value));
 
-		strncpy(node->field, req+increment, num_field_chars);
-		strncpy(node->value, field+2, num_chars - num_field_chars - 1);
+		strncpy(node->field, starter, num_field_chars);
+		strncpy(node->value, starter+num_field_chars+2, num_chars - num_field_chars - 1);
 
-		increment += num_chars + 2;
-		line = strstr(req+increment, "\r\n");
+		starter += (num_chars + 2);
 	    }
 	}
 
@@ -296,7 +290,7 @@ class Http_Request {
 	    }
 	}
 
-	char * Find(const char* field) {
+	char * Find(char* field) {
 	    Node* current = &(this->data);
 	    while (current != NULL) {
 		if (strcmp(current->field, field) == 0) {
@@ -523,8 +517,8 @@ int main(int argc, char* argv[]){
 	char* temp = rep.Prepare_Http_Response();
 	rep.Print();
 
-	Http_Request req;
-	req.Parse(receive_buffer);
+	Http_Request* req = new Http_Request();
+	req->Parse(receive_buffer);
 	//char* client = req.Find("User-Agent");
 	//if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
 		//printf("Unknown client attempted to connect!\n");
@@ -533,14 +527,14 @@ int main(int argc, char* argv[]){
 		//continue;
 	//}
 
-	char* request = req.Find("Request");
+	//char* request = req.Find("Request");
 
-	if (request == NULL) {
-		printf("Invalid Request!\n");		
-		close(newfd);
-		continue;
-	}
-	req.Print();
+	//if (request == NULL) {
+		//printf("Invalid Request!\n");		
+		//close(newfd);
+		//continue;
+	//}
+	req->Print();
 
 	memset((void*)send_buffer, 0, sizeof(send_buffer));
 	strcpy(send_buffer, temp);
