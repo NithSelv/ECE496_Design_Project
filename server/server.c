@@ -27,7 +27,7 @@ int main(int argc, char* argv[]){
     
     int port, num_connections, sockfd, newfd, bound, connecting, num_bytes_rec, num_bytes_send;
     char receive_buffer[4096];
-    char receive_buffer2[4096];
+    //char receive_buffer2[4096];
     char send_buffer[4096];
     struct sockaddr_in server_addr;
     struct sockaddr_storage client_addr;
@@ -103,7 +103,6 @@ int main(int argc, char* argv[]){
 		memset((void*)receive_buffer, 0, sizeof(receive_buffer));
 		num_bytes_rec = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);		
 	}
-	fclose(fp); //temp
 	
 	
 	//send
@@ -119,7 +118,7 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 	
-	
+	/*
 	memset((void*)receive_buffer2, 0, sizeof(receive_buffer2));
 	num_bytes_rec = recv(newfd, receive_buffer2, sizeof(receive_buffer2), 0);
 
@@ -137,7 +136,7 @@ int main(int argc, char* argv[]){
 		memset((void*)receive_buffer2, 0, sizeof(receive_buffer2));
 		num_bytes_rec = recv(newfd, receive_buffer2, sizeof(receive_buffer2), 0);		
 	}
-	
+	*/
 	
 
 	close(newfd);
