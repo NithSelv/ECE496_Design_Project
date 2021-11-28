@@ -22,23 +22,6 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
     return;
 }
 
-int send_msg(int* sock, char* buffer, char* msg) {
-    int total_bytes = 0;
-    int num_bytes = 0;
-    memset((void*)buffer, 0, sizeof(buffer));
-    strcpy(buffer, msg);
-    while (total_bytes != (int)strlen(buffer)) {
-        num_bytes = send(*sock, buffer+total_bytes, strlen(buffer) - total_bytes, 0);
-	if (num_bytes < 0) {
-		printf("FAILED: Send failed!");
-		close(*sock);
-		return -1;
-	}
-	total_bytes += num_bytes;
-    }
-    return 0;
-}
-
 struct Node {
     char * field;
     char * value;
@@ -212,38 +195,40 @@ class Metrics_Database {
 int initialize_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char data[4096];
+    char* data = new char[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
     if (ret == 0) {
 	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-	sprintf(data, "%lf\0", cpu_time);
-    	db->Add_Metric("User CPU Time (Seconds)", data);
+	sprintf(data, "%f", cpu_time);
+    	db->Add_Metric("CPU_Time_Sec", data);
 	memset((void*)data, 0, sizeof(data));
 	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-	sprintf(data, "%lf\0", calendar_time);
-	db->Add_Metric("Calendar Time (Seconds)", data);
+	sprintf(data, "%f", calendar_time);
+	db->Add_Metric("Calendar_Time", data);
     }
+    delete[] data;
     return ret;
 }
 
 int populate_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char data[4096];
+    char* data = new char[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
     if (ret == 0) {
 	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-	sprintf(data, "%lf\0", cpu_time);
-    	db->Set_Metric("User CPU Time (Seconds)", data);
+	sprintf(data, "%f", cpu_time);
+    	db->Set_Metric("cpu_time_sec", data);
 	memset((void*)data, 0, sizeof(data));
 	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-	sprintf(data, "%lf\0", calendar_time);
-	db->Set_Metric("Calendar Time (Seconds)", data);
+	sprintf(data, "%f", calendar_time);
+	db->Set_Metric("calendar_time", data);
     }
+    delete[] data;
     return ret;
 }
 
@@ -626,13 +611,23 @@ int main(int argc, char* argv[]){
 
 	char* temp = rep.Prepare_Http_Response();
 
-	sock_check = send_msg(&newfd, send_buffer, temp);
-	if (sock_check == -1) {
-	    close(sockfd);
-	    return -1;
-	}
+	int total_bytes = 0;
+    	num_bytes = 0;
+    	memset((void*)send_buffer, 0, sizeof(send_buffer));
+    	strcpy(send_buffer, temp);
 
-	temp = NULL;
+	printf("%s\n", send_buffer);
+
+    	while (total_bytes != (int)strlen(send_buffer)) {
+            num_bytes = send(newfd, send_buffer+total_bytes, strlen(send_buffer) - total_bytes, 0);
+	    if (num_bytes < 0) {
+		printf("FAILED: Send failed!");
+		close(newfd);
+		close(sockfd);
+		return -1;
+	    }
+	    total_bytes += num_bytes;
+        }
 
 	db_check = populate_database(&db, start_time);
 	if (db_check < 0) {
