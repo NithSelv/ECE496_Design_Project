@@ -172,6 +172,7 @@ class Metrics_Database {
 	    printf("Metrics Database: \n");
 	    printf("%s\n", msg);
 	    delete[] msg;
+	    msg = NULL;
 	}
 
 	
@@ -208,6 +209,7 @@ int initialize_database(Metrics_Database* db, double start_time) {
 	db->Add_Metric("Calendar Time (Seconds)", data);
     }
     delete[] data;
+    data = NULL;
     return ret;
 }
 
@@ -228,6 +230,7 @@ int populate_database(Metrics_Database* db, double start_time) {
 	db->Set_Metric("Calendar Time (Seconds)", data);
     }
     delete[] data;
+    data = NULL;
     return ret;
 }
 
@@ -269,14 +272,15 @@ class Http_Request {
 		node->value = NULL;
 		int num_field_chars = strcspn(starter, ":");
 		node->field = (char *)malloc(sizeof(char) * (num_field_chars + 1));
-		node->value = (char *)malloc(sizeof(char) * (num_chars - num_field_chars));
+		node->value = (char *)malloc(sizeof(char) * (num_chars - num_field_chars - 1));
 		
 		memset((void*)node->field, 0, sizeof(node->field));
 		memset((void*)node->value, 0, sizeof(node->value));
 
 		strncpy(node->field, starter, num_field_chars);
-		strncpy(node->value, starter+num_field_chars+2, num_chars - num_field_chars - 1);
-
+		strncpy(node->value, starter+num_field_chars+2, num_chars - num_field_chars - 2);
+		node->field[num_field_chars] = '\0';
+		node->value[num_chars - num_field_chars - 2] = '\0';
 		starter += (num_chars + 2);
 	    }
 	}
@@ -302,15 +306,15 @@ class Http_Request {
 	}
 
 	~Http_Request() {
-	    delete[] this->data.field;
+	    delete this->data.field;
 	    this->data.field = NULL;
-	    delete[] this->data.value;
+	    delete this->data.value;
 	    this->data.value = NULL;
 	    Node* node = this->data.next;
 	    while (node != NULL) {
-		delete[] node->field;
+		delete node->field;
 		node->field = NULL;
-		delete[] node->value;
+		delete node->value;
 		node->value = NULL;
 		Node* temp = node;
 		node = node->next;
@@ -396,17 +400,17 @@ class Http_Response {
 	~Http_Response() {
 	    this->last = NULL;
 	    delete[] this->send_buffer;
-	    delete[] this->data.field;
+	    delete this->data.field;
 	    this->data.field = NULL;
-	    delete[] this->data.value;
+	    delete this->data.value;
 	    this->data.value = NULL;
 	    this->send_buffer = NULL;
 	    this->buffer_size = 0;
 	    Node* node = this->data.next;
 	    while (node != NULL) {
-		delete[] node->field;
+		delete node->field;
 		node->field = NULL;
-		delete[] node->value;
+		delete node->value;
 		node->value = NULL;
 		Node* temp = node;
 		node = node->next;
@@ -426,9 +430,9 @@ int main(int argc, char* argv[]){
     struct timeval start;
     gettimeofday(&start, NULL);
     start_time = start.tv_sec + start.tv_usec * 0.000001;
-    Metrics_Database* db = new Metrics_Database();
+    Metrics_Database db;
 
-    db_check = initialize_database(db, start_time);
+    db_check = initialize_database(&db, start_time);
     if (db_check != 0) {
 	printf("FAILED: Unable to initialize database!\n");
         return -1;
@@ -484,8 +488,8 @@ int main(int argc, char* argv[]){
     	}
 
 	struct timeval timer;
-	timer.tv_sec = 0;
-	timer.tv_usec = timeout;
+	timer.tv_sec = timeout;
+	timer.tv_usec = 0;
 	int time_set = setsockopt(newfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timer, sizeof(timer));
 
         if (time_set < 0) {
@@ -509,23 +513,16 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-	Http_Response rep;
-	rep.Add_Field("Header", "HTTP/1.1 200 OK");
-	rep.Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-	//rep.Add_Field("Body", "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n");
-	rep.Add_Field("Body", db->Prepare_All_Metrics_Body());
-	char* temp = rep.Prepare_Http_Response();
-	rep.Print();
-
-	Http_Request* req = new Http_Request();
-	req->Parse(receive_buffer);
-	//char* client = req.Find("User-Agent");
-	//if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
-		//printf("Unknown client attempted to connect!\n");
-		//req.Print();	
-		//close(newfd);
-		//continue;
-	//}
+	Http_Request req;
+	req.Parse(receive_buffer);
+	char* client = req.Find("User-Agent");
+	if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+		printf("Unknown client attempted to connect!\n");
+		req.Print();	
+		close(newfd);
+		client = NULL;
+		continue;
+	}
 
 	//char* request = req.Find("Request");
 
@@ -534,10 +531,21 @@ int main(int argc, char* argv[]){
 		//close(newfd);
 		//continue;
 	//}
-	req->Print();
+	req.Print();
+
+	Http_Response rep;
+	rep.Add_Field("Header", "HTTP/1.1 200 OK");
+	rep.Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+	char* body = db.Prepare_All_Metrics_Body();
+	rep.Add_Field("Body", body);
+	char* temp = rep.Prepare_Http_Response();
+	delete body;
+	body = NULL;
+	rep.Print();
 
 	memset((void*)send_buffer, 0, sizeof(send_buffer));
 	strcpy(send_buffer, temp);
+	temp = NULL;
 
 	total_bytes = 0;
 	while (total_bytes != (int)strlen(send_buffer)) {
@@ -552,7 +560,7 @@ int main(int argc, char* argv[]){
 		total_bytes += num_bytes;
 	}
 
-	db_check = populate_database(db, start_time);
+	db_check = populate_database(&db, start_time);
 	if (db_check < 0) {
 	    printf("FAILED: database did not update!");
 	    close(newfd);
@@ -563,7 +571,6 @@ int main(int argc, char* argv[]){
 	close(newfd);
 	
     }
-
     close(sockfd);		
     return 0;
 }
