@@ -5,7 +5,14 @@
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
+#include <sys/resource.h>
+#include <sstream>
+#include <iostream>
+#include <time.h>
+
+using namespace std;
 
 void setup_server_struct(struct sockaddr_in* addr, int port) {
     addr->sin_family = AF_INET;
@@ -15,15 +22,218 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
     return;
 }
 
-struct Http_Node {
+struct Node {
     char * field;
     char * value;
-    Http_Node* next;
+    Node* next;
 };
+
+class Metrics_Database {
+    private:
+	Node metrics;
+	Node* last;
+	int size;
+    public:
+	Metrics_Database() {
+	    this->metrics.field = NULL;
+	    this->metrics.value = NULL;
+	    this->metrics.next = NULL;
+	    this->last = NULL;
+	    this->size = 0;
+	}
+
+	void Add_Metric(char * name, char* value) {
+	    if (this->last == NULL) {
+		this->last = &(this->metrics);
+	    } else {
+		this->last->next = new Node();
+		this->last = this->last->next;
+	    }
+	    this->last->field = (char *)malloc(sizeof(char) * (strlen(name) + 1));
+	    this->last->value = (char *)malloc(sizeof(char) * (strlen(value) + 1));
+	    memset((void*)this->last->field, 0, sizeof(this->last->field));
+	    memset((void*)this->last->value, 0, sizeof(this->last->value));
+	    strcpy(this->last->field, name);
+	    strcpy(this->last->value, value);
+	    this->size += strlen(name) + strlen(value) + 2;
+	}
+
+	char* Find_Metric(char* name) {
+	    char* temp = NULL;
+	    Node* current = &(this->metrics);
+	    while (current != NULL) {
+		if (strcmp(current->field, name) == 0) {
+		    temp = (char *)malloc(sizeof(current->value));
+		    strcpy(temp, current->value);
+		    return (temp);
+		}
+		current = current->next;
+	    }
+	    return NULL;
+	}
+
+	char** Find_Metrics(char* names[], int size) {
+	    int i = 0;
+	    char** metrics_list = new char*[size];
+	    for (i = 0; i < size; i++) {
+		metrics_list[i] = this->Find_Metric(names[i]);
+	    }
+	    return metrics_list;
+	}
+
+	int Set_Metric(char* name, char* value) {
+	    Node* current = &(this->metrics);
+	    while (current != NULL) {
+		if (strcmp(current->field, name) == 0) {
+		    this->size -= sizeof(current->value);
+		    delete[] current->value;
+		    current->value = (char *)malloc(sizeof(char) * (strlen(value) + 1));
+		    memset((void*)current->value, 0, sizeof(current->value));
+		    strcpy(current->value, value);
+		    this->size += sizeof(current->value);
+		    return 0;
+		}
+		current = current->next;
+	    }
+	    return -1;
+	}
+
+	int* Set_Metrics(char* names[], char* values[], int size) {
+	    int i = 0;
+	    int* metrics_list = new int[size];
+	    for (i = 0; i < size; i++) {
+		metrics_list[i] = this->Set_Metric(names[i], values[i]);
+	    }
+	    return metrics_list;
+	}
+
+	char* Prepare_Metric_Body(char* name) {
+	    char * value = Find_Metric(name);
+	    if (value == NULL) {
+		return NULL;
+	    } else {
+		char* msg = (char*)malloc(sizeof(char) * (strlen(name) + strlen(value) + 2));
+		memset((void*)msg, 0, sizeof(msg));
+		strcpy(msg, name);
+		strcat(msg, " ");
+		strcat(msg, value);
+		return msg;
+	    }
+	}
+
+	char* Prepare_Metrics_Body(char* names[], int size) {
+	    int i = 0;
+	    char* msg = (char*)malloc(sizeof(char) * this->size);
+	    memset((void*)msg, 0, sizeof(msg));
+	    for (i = 0; i < size; i++) {
+		char* temp = this->Find_Metric(names[i]);
+		if (temp == NULL) {
+		    delete[] msg;
+		    msg = NULL;
+		    return NULL;
+		} else {
+		    if (i != 0) {
+			strcat(msg, "\n");
+		    }
+		    if (i == 0) {
+			strcpy(msg, names[i]);
+		    } else {
+		        strcat(msg, names[i]);
+		    }
+		    strcat(msg, " ");
+		    strcat(msg, temp);
+		}
+	    }
+	    return msg;
+	}
+
+	char* Prepare_All_Metrics_Body() {
+	    Node* current = &(this->metrics);
+	    char* msg = (char*)malloc(sizeof(char) * this->size);
+	    memset((void*)msg, 0, sizeof(msg));
+	    while (current != NULL) {
+		if (current != (&this->metrics)) {
+		    strcat(msg, "\n");
+		}
+		if (current == (&this->metrics)) {
+		    strcpy(msg, current->field);
+		} else {
+		    strcat(msg, current->field);
+		}
+		strcat(msg, " ");
+		strcat(msg, current->value);
+		current = current->next;
+	    }
+	    return msg;
+	}
+
+	void Print() {
+	    char* msg = this->Prepare_All_Metrics_Body();
+	    printf("Metrics Database: \n");
+	    printf("%s\n", msg);
+	    delete[] msg;
+	}
+
+	
+	~Metrics_Database() {
+	    this->last = NULL;
+	    Node* node = &(this->metrics);
+	    while (node != NULL) {
+		delete[] node->field;
+		node->field = NULL;
+		delete[] node->value;
+		node->value = NULL;
+		Node* temp = node;
+		node = node->next;
+		temp->next = NULL;
+	    }
+	}
+
+};
+
+int initialize_database(Metrics_Database* db, double start_time) {
+    struct rusage stats;
+    struct timeval now;
+    char* data = new char[4096];
+    memset((void*)data, 0, sizeof(data));
+    gettimeofday(&now, NULL);
+    int ret = getrusage(RUSAGE_SELF, &stats);
+    if (ret == 0) {
+	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
+	sprintf(data, "%f", cpu_time);
+    	db->Add_Metric("User CPU Time (Seconds)", data);
+	memset((void*)data, 0, sizeof(data));
+	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
+	sprintf(data, "%f", calendar_time);
+	db->Add_Metric("Calendar Time (Seconds)", data);
+    }
+    delete[] data;
+    return ret;
+}
+
+int populate_database(Metrics_Database* db, double start_time) {
+    struct rusage stats;
+    struct timeval now;
+    char* data = new char[4096];
+    memset((void*)data, 0, sizeof(data));
+    gettimeofday(&now, NULL);
+    int ret = getrusage(RUSAGE_SELF, &stats);
+    if (ret == 0) {
+	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
+	sprintf(data, "%f", cpu_time);
+    	db->Set_Metric("User CPU Time (Seconds)", data);
+	memset((void*)data, 0, sizeof(data));
+	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
+	sprintf(data, "%f", calendar_time);
+	db->Set_Metric("Calendar Time (Seconds)", data);
+    }
+    delete[] data;
+    return ret;
+}
 
 class Http_Request {
     private:
-	Http_Node data;
+	Node data;
     public:
 	Http_Request() {
 	    this->data.field = NULL;
@@ -51,12 +261,12 @@ class Http_Request {
 	    
 	    line = strstr(req+increment, "\r\n");
 
-	    Http_Node* node = &(this->data);
+	    Node* node = &(this->data);
 	    node->next = NULL;
 
 	    while (line != last_line) {
 		num_chars = line - (req+increment);
-		node->next = new Http_Node();
+		node->next = new Node();
 		node = node->next;
 		node->next = NULL;
 		node->field = NULL;
@@ -78,7 +288,7 @@ class Http_Request {
 	}
 
 	void Print() {
-	    Http_Node* current = &(this->data);
+	    Node* current = &(this->data);
 	    printf("Here is the received HTTP Request: \n");
 	    while (current != NULL) {
 		printf("%s: %s\n", current->field, current->value);
@@ -87,7 +297,7 @@ class Http_Request {
 	}
 
 	char * Find(const char* field) {
-	    Http_Node* current = &(this->data);
+	    Node* current = &(this->data);
 	    while (current != NULL) {
 		if (strcmp(current->field, field) == 0) {
 		    return (current->value);
@@ -98,23 +308,27 @@ class Http_Request {
 	}
 
 	~Http_Request() {
-	    Http_Node* node = &(this->data);
+	    delete[] this->data.field;
+	    this->data.field = NULL;
+	    delete[] this->data.value;
+	    this->data.value = NULL;
+	    Node* node = this->data.next;
 	    while (node != NULL) {
 		delete[] node->field;
 		node->field = NULL;
 		delete[] node->value;
 		node->value = NULL;
-		Http_Node* temp = node;
+		Node* temp = node;
 		node = node->next;
-		temp->next = NULL;
+		delete temp;
 	    }
 	}
 };
 
 class Http_Response {
     private:
-	Http_Node data;
-	Http_Node* last;
+	Node data;
+	Node* last;
 	char * send_buffer;
 	int buffer_size;
     public:
@@ -131,7 +345,7 @@ class Http_Response {
 	    if (this->last == NULL) {
 		this->last = &(this->data);
 	    } else {
-		this->last->next = new Http_Node();
+		this->last->next = new Node();
 		this->last = this->last->next;
 	    }
 	    this->last->field = (char *)malloc(sizeof(char) * (strlen(field) + 1));
@@ -151,8 +365,8 @@ class Http_Response {
 	}
 
 	void Print() {
-	    Http_Node* current = &(this->data);
-	    printf("Here is the send HTTP Response: \n");
+	    Node* current = &(this->data);
+	    printf("Here is the sent HTTP Response: \n");
 	    while (current != NULL) {
 		printf("%s: %s\n", current->field, current->value);
 		current = current->next;
@@ -160,7 +374,7 @@ class Http_Response {
 	}
 
 	char* Prepare_Http_Response() {
-	    Http_Node* current = &(this->data);
+	    Node* current = &(this->data);
 	    this->send_buffer = (char *)malloc(sizeof(char) * (this->buffer_size + 1));
 	    memset((void*)this->send_buffer, 0, sizeof(this->send_buffer));
 	    while (current != NULL) {
@@ -188,17 +402,21 @@ class Http_Response {
 	~Http_Response() {
 	    this->last = NULL;
 	    delete[] this->send_buffer;
+	    delete[] this->data.field;
+	    this->data.field = NULL;
+	    delete[] this->data.value;
+	    this->data.value = NULL;
 	    this->send_buffer = NULL;
 	    this->buffer_size = 0;
-	    Http_Node* node = &(this->data);
+	    Node* node = this->data.next;
 	    while (node != NULL) {
 		delete[] node->field;
 		node->field = NULL;
 		delete[] node->value;
 		node->value = NULL;
-		Http_Node* temp = node;
+		Node* temp = node;
 		node = node->next;
-		temp->next = NULL;
+		delete temp;
 	    }
 	    this->buffer_size = 0;
 	}
@@ -206,12 +424,21 @@ class Http_Response {
 
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes, timeout;
-    //char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\n\r\n";
-    //char body[4096] = "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n";
+    int port, num_connections, sockfd, newfd, bound, connecting, num_bytes, total_bytes, timeout, db_check;
+    double start_time = 0;
     char receive_buffer[4096];
     char send_buffer[4096];
     struct sockaddr_in server_addr;
+    struct timeval start;
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec + start.tv_usec * 0.000001;
+    Metrics_Database* db = new Metrics_Database();
+
+    db_check = initialize_database(db, start_time);
+    if (db_check != 0) {
+	printf("FAILED: Unable to initialize database!\n");
+        return -1;
+    }
 
     if (argc != 4) {
         printf("FAILED: Not enough arguments\n");
@@ -249,6 +476,7 @@ int main(int argc, char* argv[]){
 
 
     while(1) {
+
 	struct sockaddr_storage client_addr;
     	socklen_t client_addr_size;
 
@@ -276,7 +504,11 @@ int main(int argc, char* argv[]){
 	memset((void*)receive_buffer, 0, sizeof(receive_buffer));
 	num_bytes = recv(newfd, receive_buffer, sizeof(receive_buffer), 0);
 
-	if (num_bytes < 0) {
+	if ((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
+		printf("TIMEDOUT: Server timeout waiting for packet. Connection closed.\n");
+		close(newfd);
+		continue;
+	} else if (num_bytes < 0) {
 		printf("FAILED: Receive failed!");
 		close(newfd);
 		close(sockfd);
@@ -286,7 +518,8 @@ int main(int argc, char* argv[]){
 	Http_Response rep;
 	rep.Add_Field("Header", "HTTP/1.1 200 OK");
 	rep.Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-	rep.Add_Field("Body", "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n");
+	//rep.Add_Field("Body", "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n");
+	rep.Add_Field("Body", db->Prepare_All_Metrics_Body());
 	char* temp = rep.Prepare_Http_Response();
 	rep.Print();
 
@@ -323,6 +556,14 @@ int main(int argc, char* argv[]){
 			return -1;
 		}
 		total_bytes += num_bytes;
+	}
+
+	db_check = populate_database(db, start_time);
+	if (db_check < 0) {
+	    printf("FAILED: database did not update!");
+	    close(newfd);
+	    close(sockfd);
+	    return -1;
 	}
 	printf("One connection handled!\n");
 	close(newfd);
