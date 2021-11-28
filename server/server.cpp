@@ -33,6 +33,7 @@ class Http_Request {
 
 	void Parse(char* req) {
 	    char* line = strstr(req, "\r\n");
+	    char* last_line = strstr(req, "\r\n\r\n");
 	    int num_chars = (line - req);
 	    int increment = 0;
 
@@ -47,16 +48,19 @@ class Http_Request {
 	    strncpy(this->data.value, req, num_chars);
 
 	    increment += num_chars + 2;
+	    
 	    line = strstr(req+increment, "\r\n");
-	    num_chars = line - (req+increment);
 
 	    Http_Node* node = &(this->data);
 	    node->next = NULL;
 
-	    while (num_chars > 0) {
+	    while (line != last_line) {
+		num_chars = line - (req+increment);
 		node->next = new Http_Node();
 		node = node->next;
 		node->next = NULL;
+		node->field = NULL;
+		node->value = NULL;
 		char* field = strstr(req+increment, ": ");
 		int num_field_chars = field - (req+increment);
 		node->field = (char *)malloc(sizeof(char) * (num_field_chars + 1));
@@ -70,7 +74,6 @@ class Http_Request {
 
 		increment += num_chars + 2;
 		line = strstr(req+increment, "\r\n");
-		num_chars = line - (req+increment);
 	    }
 	}
 
@@ -268,20 +271,31 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-	Http_Request req;
-	req.Parse(receive_buffer);
-	req.Print();
-
-	//memset((void*)send_buffer, 0, sizeof(send_buffer));
-	
-	//strcpy(send_buffer, header);
-	//strcat(send_buffer, body);
 	Http_Response rep;
 	rep.Add_Field("Header", "HTTP/1.1 200 OK");
 	rep.Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
 	rep.Add_Field("Body", "# HELP random_metric1 Totally random value p1.\n# TYPE random_metric1 counter\nrandom_metric1 100.32\n");
 	char* temp = rep.Prepare_Http_Response();
 	rep.Print();
+
+	Http_Request req;
+	req.Parse(receive_buffer);
+	//char* client = req.Find("User-Agent");
+	//if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+		//printf("Unknown client attempted to connect!\n");
+		//req.Print();	
+		//close(newfd);
+		//continue;
+	//}
+
+	char* request = req.Find("Request");
+
+	if (request == NULL) {
+		printf("Invalid Request!\n");		
+		close(newfd);
+		continue;
+	}
+	req.Print();
 
 	memset((void*)send_buffer, 0, sizeof(send_buffer));
 	strcpy(send_buffer, temp);
