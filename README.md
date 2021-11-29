@@ -8,6 +8,12 @@ The goal of this project is to design a HTTP server that can act as a liasion be
 
 This can be done by allowing a Prometheus instance to send HTTP requests to the server (which will be running on a port specified in the Prometheus config file) which will allow it to scrape metrics from the endpoint. The server should provide those metrics from JITServer and return them to Prometheus in a valid HTTP Response. 
 
+## Server Diagram
+
+![image](https://user-images.githubusercontent.com/46902009/143926505-b89aab9d-cc62-436a-91a0-b1fd354a6de1.png)
+
+Note: All arrows in blue identify code that has been completed and all arrows in read identify code that still needs to be written
+
 ## Current Progress
 
 As of November, 29th, 2021, the current tasks have been implemented in the HTTP server:
