@@ -96,8 +96,11 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
-    if (argc != 4) {
+    if (argc < 4) {
         printf("FAILED: Not enough arguments\n");
+        return -1;
+    } else if (argc > 4) {
+	printf("FAILED: Too many arguments\n");
         return -1;
     } else {
 	strcpy(port_num, argv[1]);
