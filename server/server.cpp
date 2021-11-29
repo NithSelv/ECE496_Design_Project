@@ -22,12 +22,12 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
 }
 
 char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num) {
-    //char* client = (*req).Find("User-Agent");
-    //if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
-        //printf("Unauthorized Client!\n");
-	//(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
-	//return (*rep).Prepare_Http_Response();
-    //} 
+    char* client = (*req).Find("User-Agent");
+    if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+        printf("Unauthorized Client!\n");
+	(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
+	return (*rep).Prepare_Http_Response();
+    } 
 
     char* type = (*req).Find("Type");
     char* metric = (*req).Find("Metric");
@@ -40,8 +40,10 @@ char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* 
     }
 
     char* port_s = strtok(ip, ":");
-    char* host = port_s;
+    char* host[100] = "";
+    strcpy(host, port_s);
     port_s = strtok(NULL, ":");
+    printf("The host is %s and the port is %s", host, port_s);
 
     if ((type == NULL) || (metric == NULL) || (host == NULL) || (port_s == NULL)) {
 	printf("Invalid Request!\n");		
@@ -61,7 +63,7 @@ char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* 
 	return (*rep).Prepare_Http_Response();
     }
 
-    if ((strncmp(host, "localhost", 9) != 0) && (strncmp(port_s, port_num, strlen(port_num)) != 0)) {
+    if (strncmp(port_s, port_num, strlen(port_num)) != 0) {
 	printf("Wrong server or port!\n");		
 	(*rep).Add_Field("Header", "HTTP/1.1 303 See Other");
 	return (*rep).Prepare_Http_Response();
