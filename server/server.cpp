@@ -42,7 +42,7 @@ class Metrics_Database {
 	    this->size = 0;
 	}
 
-	void Add_Metric(char * name, char* value) {
+	void Add_Metric(const char* name, char* value) {
 	    if (this->last == NULL) {
 		this->last = &(this->metrics);
 	    } else {
@@ -58,7 +58,7 @@ class Metrics_Database {
 	    this->size += strlen(name) + strlen(value) + 2;
 	}
 
-	char* Find_Metric(char* name) {
+	char* Find_Metric(char name[]) {
 	    char* temp = NULL;
 	    Node* current = &(this->metrics);
 	    while (current != NULL) {
@@ -81,7 +81,7 @@ class Metrics_Database {
 	    return metrics_list;
 	}
 
-	int Set_Metric(char* name, char* value) {
+	int Set_Metric(const char* name, char* value) {
 	    Node* current = &(this->metrics);
 	    while (current != NULL) {
 		if (strcmp(current->field, name) == 0) {
@@ -320,7 +320,7 @@ class Http_Request {
 	    }
 	}
 
-	char * Find(char* field) {
+	char * Find(const char* field) {
 	    Node* current = &(this->data);
 	    while (current != NULL) {
 		if (strcmp(current->field, field) == 0) {
@@ -498,13 +498,16 @@ char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* 
     printf("Valid Request Received!\n");
     (*rep).Add_Field("Header", "HTTP/1.1 200 OK");
     (*rep).Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    (*rep).Add_Field("Body", db->Prepare_All_Metrics_Body());
+    char * body = db->Prepare_All_Metrics_Body();
+    (*rep).Add_Field("Body", body);
+    delete body;
+    body = NULL;
     return (*rep).Prepare_Http_Response();
 }
 
 int main(int argc, char* argv[]){
     
-    int port, num_connections, sockfd, newfd, bound, connecting, timeout, db_check, sock_check;
+    int port, num_connections, sockfd, newfd, bound, connecting, timeout, db_check;
     char port_num[100] = "";
     double start_time = 0;
     char receive_buffer[4096];
@@ -513,9 +516,9 @@ int main(int argc, char* argv[]){
     struct timeval start;
     gettimeofday(&start, NULL);
     start_time = start.tv_sec + start.tv_usec * 0.000001;
-    Metrics_Database* db = new Metrics_Database();
+    Metrics_Database db;
 
-    db_check = initialize_database(db, start_time);
+    db_check = initialize_database(&db, start_time);
     if (db_check != 0) {
 	printf("FAILED: Unable to initialize database!\n");
         return -1;
@@ -600,18 +603,16 @@ int main(int argc, char* argv[]){
 
 	req.Parse(receive_buffer);
 
-	char * http_rep = http_error_check(&req, &rep, db, port_num);
+	char * http_rep = http_error_check(&req, &rep, &db, port_num);
 
 	req.Print();
-	printf("\n");
+	printf("\n\n");
 	rep.Print();
 
 	int total_bytes = 0;
     	num_bytes = 0;
     	memset((void*)send_buffer, 0, sizeof(send_buffer));
     	strcpy(send_buffer, http_rep);
-
-	printf("%s\n", send_buffer);
 
     	while (total_bytes != (int)strlen(send_buffer)) {
             num_bytes = send(newfd, send_buffer+total_bytes, strlen(send_buffer) - total_bytes, 0);
@@ -624,7 +625,7 @@ int main(int argc, char* argv[]){
 	    total_bytes += num_bytes;
         }
 
-	db_check = populate_database(db, start_time);
+	db_check = populate_database(&db, start_time);
 	if (db_check < 0) {
 	    printf("FAILED: database did not update!");
 	    close(newfd);
@@ -636,7 +637,6 @@ int main(int argc, char* argv[]){
 	close(newfd);
 	
     }
-    delete db;
     close(sockfd);		
     return 0;
 }
