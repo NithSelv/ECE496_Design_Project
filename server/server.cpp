@@ -86,7 +86,8 @@ class Metrics_Database {
 	    while (current != NULL) {
 		if (strcmp(current->field, name) == 0) {
 		    this->size -= sizeof(current->value);
-		    delete[] current->value;
+		    delete current->value;
+		    current->value = NULL;
 		    current->value = (char *)malloc(sizeof(char) * (strlen(value) + 1));
 		    memset((void*)current->value, 0, sizeof(current->value));
 		    strcpy(current->value, value);
@@ -195,27 +196,26 @@ class Metrics_Database {
 int initialize_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char* data = new char[4096];
+    char data[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
     if (ret == 0) {
 	double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
 	sprintf(data, "%f", cpu_time);
-    	db->Add_Metric("CPU_Time_Sec", data);
+    	db->Add_Metric("cpu_time_sec", data);
 	memset((void*)data, 0, sizeof(data));
 	double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
 	sprintf(data, "%f", calendar_time);
-	db->Add_Metric("Calendar_Time", data);
+	db->Add_Metric("calendar_time", data);
     }
-    delete[] data;
     return ret;
 }
 
 int populate_database(Metrics_Database* db, double start_time) {
     struct rusage stats;
     struct timeval now;
-    char* data = new char[4096];
+    char data[4096];
     memset((void*)data, 0, sizeof(data));
     gettimeofday(&now, NULL);
     int ret = getrusage(RUSAGE_SELF, &stats);
@@ -228,7 +228,6 @@ int populate_database(Metrics_Database* db, double start_time) {
 	sprintf(data, "%f", calendar_time);
 	db->Set_Metric("calendar_time", data);
     }
-    delete[] data;
     return ret;
 }
 
@@ -372,6 +371,7 @@ class Http_Response {
 	    } else {
 		this->last->next = new Node();
 		this->last = this->last->next;
+		this->last->next = NULL;
 	    }
 	    this->last->field = (char *)malloc(sizeof(char) * (strlen(field) + 1));
 	    this->last->value = (char *)malloc(sizeof(char) * (strlen(value) + 1));
@@ -449,13 +449,13 @@ class Http_Response {
 	}
 };
 
-char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num, char* body) {
-    char* client = (*req).Find("User-Agent");
-    if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
-        printf("Unauthorized Client!\n");
-	(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
-	return (*rep).Prepare_Http_Response();
-    } 
+char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num) {
+    //char* client = (*req).Find("User-Agent");
+    //if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+        //printf("Unauthorized Client!\n");
+	//(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
+	//return (*rep).Prepare_Http_Response();
+    //} 
 
     char* type = (*req).Find("Type");
     char* metric = (*req).Find("Metric");
@@ -498,8 +498,7 @@ char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* 
     printf("Valid Request Received!\n");
     (*rep).Add_Field("Header", "HTTP/1.1 200 OK");
     (*rep).Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    body = db->Prepare_All_Metrics_Body();
-    (*rep).Add_Field("Body", body);
+    (*rep).Add_Field("Body", db->Prepare_All_Metrics_Body());
     return (*rep).Prepare_Http_Response();
 }
 
@@ -514,9 +513,9 @@ int main(int argc, char* argv[]){
     struct timeval start;
     gettimeofday(&start, NULL);
     start_time = start.tv_sec + start.tv_usec * 0.000001;
-    Metrics_Database db;
+    Metrics_Database* db = new Metrics_Database();
 
-    db_check = initialize_database(&db, start_time);
+    db_check = initialize_database(db, start_time);
     if (db_check != 0) {
 	printf("FAILED: Unable to initialize database!\n");
         return -1;
@@ -601,9 +600,7 @@ int main(int argc, char* argv[]){
 
 	req.Parse(receive_buffer);
 
-	char* body;
-
-	char * http_rep = http_error_check(&req, &rep, &db, port_num, body);
+	char * http_rep = http_error_check(&req, &rep, db, port_num);
 
 	req.Print();
 	printf("\n");
@@ -627,11 +624,7 @@ int main(int argc, char* argv[]){
 	    total_bytes += num_bytes;
         }
 
-	delete body;
-	body = NULL;
-	http_rep = NULL;
-
-	db_check = populate_database(&db, start_time);
+	db_check = populate_database(db, start_time);
 	if (db_check < 0) {
 	    printf("FAILED: database did not update!");
 	    close(newfd);
@@ -639,9 +632,11 @@ int main(int argc, char* argv[]){
 	    return -1;
 	}
 	printf("One connection handled!\n");
+
 	close(newfd);
 	
     }
+    delete db;
     close(sockfd);		
     return 0;
 }
