@@ -1,7 +1,7 @@
-CC=gcc
+CC=g++
 all:
-	gcc -pthread -Wall -g -o server server.c
+	g++ -Wall -g -o server server.cpp   	
 server:
-	gcc -pthread -Wall -g -o server server.c
+	g++ -Wall -g -o server server.cpp
 clean:
-	rm -f *.o server
+	rm -f *.o server 
