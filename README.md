@@ -29,7 +29,7 @@ As of November, 29th, 2021, the current tasks have been implemented in the HTTP 
   - `404 Resource Not Found` is sent if the client performs a GET request for an invalid endpoint
   - `303 See Other` is sent if the client requests for a port that the server is not running on/responsible for
   - `200 Ok` is sent if the above issues do not occur, the Content-Type is text/plain, and the body includes all the metrics formatted as `metric_name metric_value` where each metric is separated by a new line character 
-  - Wrote a tester script to test the server on a variety of criteria. Can be found in `/tester/tester.sh` and run in the `/server` folder as `./path_to_tester.sh port endpoint`. Note: the script requires `curl` to be installed.  
+- Wrote a tester script to test the server on a variety of criteria. Can be found in `/tester/tester.sh` and run in the `/server` folder as `./path_to_tester.sh port endpoint`. Note: the script requires `curl` to be installed.  
 
 ## Testing
 
