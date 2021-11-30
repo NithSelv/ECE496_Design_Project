@@ -4,140 +4,161 @@
 test_invalid_args() {
 	local TESTS=4
 	local CORRECT=0
-	echo "STARTING TEST1 INVALID SERVER ARGS"
+	echo "Starting TESTER PART1: INVALID SERVER ARGS"
 	## Too few args
+	echo "Test1: No Arguments"
 	local RET=$(./server)
 	if [[ "${RET}" == "FAILED: Not enough arguments" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST1 PASSED!"
+		echo "Test1 Passed!"
 	else 
-		echo "TEST1 FAILED!"
+		echo "Test1 Failed!"
 	fi
+	echo "Test2: Port Number Only"
 	RET=$(./server 7390)
 	if [[ "${RET}" == "FAILED: Not enough arguments" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST2 PASSED!"
+		echo "Test2 Passed!"
 	else 
-		echo "TEST2 FAILED!"
+		echo "Test2 Failed!"
 	fi
+	echo "Test3: Port Number and Number of Connections"
 	RET=$(./server 7390 5)
 	if [[ "${RET}" == "FAILED: Not enough arguments" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST3 PASSED!"
+		echo "Test3 Passed!"
 	else 
-		echo "TEST3 FAILED!"
+		echo "Test3 Failed!"
 	fi
 	## Too many args
+	echo "Test4: Port Number, Number of Connections, Timeout, and Extra Arg"
 	RET=$(./server 7390 5 5 6)
 	if [[ "${RET}" == "FAILED: Too many arguments" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST4 PASSED!"
+		echo "Test4 Passed!"
 	else 
-		echo "TEST4 FAILED!"
+		echo "Test4 Failed!"
 	fi
 	echo "Test1: Invalid Args Status: Pass Accuracy ${CORRECT}/${TESTS}"
 }
 
 test_invalid_http_requests() {
-	local TESTS=7
+	local TESTS=8
 	local CORRECT=0
-	echo "STARTING TEST2 INVALID HTTP REQUESTS"
+	echo "Starting TESTER PART2: INVALID HTTP REQUESTS"
 	## Forget to specify the user agent is prometheus
 	local RET=$(curl -X GET -H "User-Agent:" -s -o /dev/null -w "%{http_code}" http://localhost:${1})
+	echo "Test1: Not Sending the User-Agent"
 	if [[ "${RET}" == "401" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST1 PASSED!"
+		echo "Test1 Passed!"
 	else 
-		echo "TEST1 FAILED!"
+		echo "Test1 Failed!"
 	fi
-	## Specify that the user agent is prometheus, but don't sepcify the host
+	## Send incorrect user agent
+	local RET=$(curl -X GET -H "User-Agent: Random" -s -o /dev/null -w "%{http_code}" http://localhost:${1})
+	echo "Test2: Sending the Incorrect User-Agent"
+	if [[ "${RET}" == "401" ]]; then
+		((CORRECT=CORRECT+1)) 
+		echo "Test2 Passed!"
+	else 
+		echo "Test2 Failed!"
+	fi
+	echo "Test3: Don't specify the host"
+	## Specify that the user agent is prometheus, but don't specify the host
 	RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host:" -s -o /dev/null -w "%{http_code}" http://localhost:${1})
 	if [[ "${RET}" == "400" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST2 PASSED!"
+		echo "Test3 Passed!"
 	else 
-		echo "TEST2 FAILED!"
+		echo "Test3 Failed!"
 	fi
+	echo "Test4: Forgot the port number"
 	## Mention the host but forget the port number
 	RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost" -s -o /dev/null -w "%{http_code}" http://localhost:${1})
 	if [[ "${RET}" == "400" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST3 PASSED!"
+		echo "Test4 Passed!"
 	else 
-		echo "TEST3 FAILED!"
+		echo "Test4 Failed!"
 	fi
+	echo "Test5: Don't specify the endpoint"
 	## Set the host properly, but forget to mention which resource we want
 	RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s -o /dev/null -w "%{http_code}" http://localhost:${1})
-	if [[ "${RET}" == "400" ]]; then
+	if [[ "${RET}" == "404" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST4 PASSED!"
+		echo "Test5 Passed!"
 	else 
-		echo "TEST4 FAILED!"
+		echo "Test5 Failed!"
 	fi
 	## Mention the wrong resource
+	echo "Test6: Specify the incorrect endpoint"
 	RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s -o /dev/null -w "%{http_code}" http://localhost:${1}/wrong_resource)
 	if [[ "${RET}" == "404" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST5 PASSED!"
+		echo "Test6 Passed!"
 	else 
-		echo "TEST5 FAILED!"
+		echo "Test6 Failed!"
 	fi
 	## Right resource, wrong port number
+	echo "Test7: Specify the wrong port number"
 	RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:23" -s -o /dev/null -w "%{http_code}" http://localhost:${1}/${2})
 	if [[ "${RET}" == "303" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST6 PASSED!"
+		echo "Test7 Passed!"
 	else 
-		echo "TEST6 FAILED!"
+		echo "Test7 Failed!"
 	fi
 	## Send a POST request instead of a GET request
+	echo "Test8: Send the wrong type of request"
 	RET=$(curl -X POST -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s -o /dev/null -w "%{http_code}" http://localhost:${1}/${2})
 	if [[ "${RET}" == "400" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST7 PASSED!"
+		echo "Test8 Passed!"
 	else 
-		echo "TEST7 FAILED!"
+		echo "Test8 Failed!"
 	fi
-	echo "Test2: Check Invalid HTTP Headers: Pass Accuracy ${CORRECT}/${TESTS}"
+	echo "TESTER PART2: INVALID HTTP REQUESTS: Pass Accuracy ${CORRECT}/${TESTS}"
 }
 
 test_check_valid_metrics() {
 	local TESTS=2
 	local CORRECT=0
-	echo "STARTING TEST3 CHECK VALID METRICS"
+	echo "Starting TESTER PART3: CHECK VALID METRICS"
 	## Check to make sure that our HTTP Requests are valid
+	echo "Test1: Send a valid http request"
 	local RET=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s -o /dev/null -w "%{http_code}" http://localhost:${1}/${2})
 	if [[ "${RET}" == "200" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST1 PASSED!"
+		echo "Test1 Passed!"
 	else
-		echo "TEST1 FAILED!"
+		echo "Test1 Failed!"
 	fi
 	## Send an HTTP Request to get the metrics
+	echo "Test2: Send 2 valid http requests and check if the metrics have changed"
 	local RET1=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s http://localhost:${1}/${2})
 	## Send another HTTP Request to get the updated metrics
 	local RET2=$(curl -X GET -H "User-Agent: Prometheus" -H "Host: localhost:${1}" -s http://localhost:${1}/${2})
 	if [[ "${RET1}" != "${RET2}" ]]; then
 		((CORRECT=CORRECT+1)) 
-		echo "TEST2 PASSED!"
+		echo "Test2 Passed!"
 	else 
-		echo "TEST1 FAILED!"
+		echo "Test1 Failed!"
 	fi
-	echo "Test3: test_check_valid_metrics: Pass Accuracy ${CORRECT}/${TESTS}"
+	echo "TESTER PART3: CHECK VALID METRICS: Pass Accuracy ${CORRECT}/${TESTS}"
 }
 
 if [ "$#" -ne 2 ]; then
 	echo "Error: you must specify the server port and the endpoint name!"
 	exit 1
 fi 
-echo "STARTING TESTING"
+echo "Starting testing..."
 test_invalid_args
-echo "STARTING UP SERVER FOR TEST2 AND TEST3"
+echo "Starting server..."
 ./server $1 10 1 >/dev/null 2>&1 &
-echo "SERVER IS RUNNING"
-echo "PID IS ${p}"
+echo "Server is running..."
 test_invalid_http_requests $1 $2
 test_check_valid_metrics $1 $2
-echo "TESTING IS FINISHED, KILLING SERVER"
+echo "Testing is finished, killing server"
 
 
