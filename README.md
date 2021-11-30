@@ -33,7 +33,9 @@ As of November, 29th, 2021, the current tasks have been implemented in the HTTP 
 
 ## Testing
 
-Currently, the server is passing on 14/14 testcases.
+Currently, the server is passing on 14/14 testcases. In addition, as seen in the sample image below, we are able to display metrics that change over time. The computation of the metrics is done by our server for now and it is stored in a Metrics_Database object. Later, we plan to change the functionality so that it will retrieve the metrics from JITServer and store them into the Metrics_Database object.
+
+![image](https://user-images.githubusercontent.com/46902009/143985492-37beb3c9-34eb-4e86-b305-19ac1f578a78.png)
 
 ## Future Updates
 
