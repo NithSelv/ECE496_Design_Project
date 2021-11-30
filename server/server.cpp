@@ -22,52 +22,56 @@ void setup_server_struct(struct sockaddr_in* addr, int port) {
 }
 
 char* http_error_check(Http_Request* req, Http_Response* rep, Metrics_Database* db, char* port_num) {
-    //char* client = (*req).Find("User-Agent");
-    //if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
+    char* client = (*req).Find("User-Agent");
+    if ((client == NULL) || (strncmp(client, "Prometheus", 10) != 0)) {
         //printf("Unauthorized Client!\n");
-	//(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
-	//return (*rep).Prepare_Http_Response();
-    //} 
+	(*rep).Add_Field("Header", "HTTP/1.1 401 Unauthorized");	
+	return (*rep).Prepare_Http_Response();
+    } 
 
     char* type = (*req).Find("Type");
     char* metric = (*req).Find("Metric");
     char* ip = (*req).Find("Host");
 
     if (ip == NULL) {
-	printf("Invalid Request!\n");
+	//printf("Invalid Request!\n");
 	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
 	return (*rep).Prepare_Http_Response();	
     }
 
+    printf("The ip is %s", ip);
     char* port_s = strtok(ip, ":");
-    char* host = port_s;
+    char host[100];
+    memset((void*)host, 0, sizeof(host));
+    strcpy(host, port_s);
     port_s = strtok(NULL, ":");
+    printf("The host is %s and the port is %s", host, port_s);
 
     if ((type == NULL) || (metric == NULL) || (host == NULL) || (port_s == NULL)) {
-	printf("Invalid Request!\n");		
+	//printf("Invalid Request!\n");		
 	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
 	return (*rep).Prepare_Http_Response();
     } 
 
     if (strncmp(type, "GET", 3) != 0){
-	printf("Invalid Request!\n");		
+	//printf("Invalid Request!\n");		
 	(*rep).Add_Field("Header", "HTTP/1.1 400 Bad Request");
 	return (*rep).Prepare_Http_Response();
     }
 
     if (strncmp(metric, "/metrics", 8) != 0) {
-	printf("Not Found!\n");		
+	//printf("Not Found!\n");		
 	(*rep).Add_Field("Header", "HTTP/1.1 404 Not Found");
 	return (*rep).Prepare_Http_Response();
     }
 
-    if ((strncmp(host, "localhost", 9) != 0) && (strncmp(port_s, port_num, strlen(port_num)) != 0)) {
-	printf("Wrong server or port!\n");		
+    if (strncmp(port_s, port_num, strlen(port_num)) != 0) {
+	//printf("Wrong server or port!\n");		
 	(*rep).Add_Field("Header", "HTTP/1.1 303 See Other");
 	return (*rep).Prepare_Http_Response();
     }
 
-    printf("Valid Request Received!\n");
+    //printf("Valid Request Received!\n");
     (*rep).Add_Field("Header", "HTTP/1.1 200 OK");
     (*rep).Add_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
     char * body = db->Prepare_All_Metrics_Body();
@@ -96,8 +100,11 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
-    if (argc != 4) {
+    if (argc < 4) {
         printf("FAILED: Not enough arguments\n");
+        return -1;
+    } else if (argc > 4) {
+	printf("FAILED: Too many arguments\n");
         return -1;
     } else {
 	strcpy(port_num, argv[1]);
@@ -177,9 +184,9 @@ int main(int argc, char* argv[]){
 
 	char * http_rep = http_error_check(&req, &rep, &db, port_num);
 
-	req.Print();
-	printf("\n\n");
-	rep.Print();
+	//req.Print();
+	//printf("\n\n");
+	//rep.Print();
 
 	int total_bytes = 0;
     	num_bytes = 0;
@@ -204,7 +211,7 @@ int main(int argc, char* argv[]){
 	    close(sockfd);
 	    return -1;
 	}
-	printf("One connection handled!\n");
+	//printf("One connection handled!\n");
 
 	close(newfd);
 	
