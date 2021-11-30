@@ -23,7 +23,7 @@ As of November, 29th, 2021, the current tasks have been implemented in the HTTP 
 - Server can parse the HTTP Requests using the `Http_Request` class which will create a Linked-List of field, value pairs. Use `Find` method to search for the value of a particular field. Parse a given Http Request using the `Parse_Http_Request` method.
 - Server can create a HTTP Response using the `Http_Response` class which will create a Linked-List of field, value pairs. Use `Add_Field` method to add Http Headers or Body content. Create the Http_Response using the `Prepare_Http_Response` method.  
 - Server can retrieve/update/store metrics using the `Metrics_Database` class which will create a Linked-List of field, value pairs. Use `Find_Metric` method to find a particular metric value. To initialize and update all the metrics in the Metrics_Database use the `Initialize` and `Update` methods. To add new metrics or update a particular metric, use the `Add_Metric` and `Set_Metric` methods respectively.
-- Server can send back the following Http Responses (Code is written, still being tested):
+- Server can send back the following Http Responses:
   - `401 Unauthorized` is sent is User-Agent is not Prometheus
   - `400 Bad Request` is sent if the request is not a GET request and the Host field is not provided 
   - `404 Resource Not Found` is sent if the client performs a GET request for an invalid endpoint
