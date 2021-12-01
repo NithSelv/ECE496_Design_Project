@@ -175,6 +175,8 @@ fi
 echo "Starting testing..."
 test_invalid_args
 echo "Starting server..."
+trap "exit" INT TERM ERR
+trap "kill 0" EXIT
 ./server $1 10 1 &
 echo "Server is running..."
 test_invalid_http_requests $1 $2
