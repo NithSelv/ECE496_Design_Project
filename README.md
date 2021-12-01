@@ -39,7 +39,7 @@ Currently, the server is passing on 14/14 testcases. In addition, as seen in the
 
 ## Future Updates
 
-We plan to implement the following updates fairly soon::
+We plan to implement the following updates fairly soon:
 
 - (HIGH PRIORITY) Server can handle multiple clients on different ports connecting
 - (HIGH PRIORITY) Recv call must be iterated because maybe the full request is not received all at once
