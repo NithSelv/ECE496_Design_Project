@@ -42,6 +42,7 @@ Currently, the server is passing on 14/14 testcases. In addition, as seen in the
 We plan to implement the following updates fairly soon::
 
 - (HIGH PRIORITY) Server can handle multiple clients on different ports connecting
+- (HIGH PRIORITY) Recv call must be iterated because maybe the full request is not received all at once
 - (HIGH PRIORITY) Add a test for memory leaks
 - (HIGH PRIORITY) Server can scrape metrics from JITServer and store them in the `Metrics_Database` object
 - (MEDIUM PRIORITY) Server should use less dynamically memory allocation and more static allocation (Http_Request and Http_Response) to avoid potential deallocation issues
