@@ -39,9 +39,12 @@ Currently, the server is passing on 14/14 testcases. In addition, as seen in the
 
 ## Future Updates
 
-We plan to implement the following updates fairly soon:
+We plan to implement the following updates fairly soon::
 
 - (HIGH PRIORITY) Server can handle multiple clients on different ports connecting
+- (HIGH PRIORITY) Add a test for memory leaks
 - (HIGH PRIORITY) Server can scrape metrics from JITServer and store them in the `Metrics_Database` object
-- (MEDIUM PRIORITY) Server should use less dynamically memory allocation and more static allocation to avoid potential deallocation issues
+- (MEDIUM PRIORITY) Server should use less dynamically memory allocation and more static allocation (Http_Request and Http_Response) to avoid potential deallocation issues
+- (MEDIUM PRIORITY) Server should use a map for the metrics to enable faster lookup -> Binary Search
 - (LOW PRIORITY) (Additional Feature) Respond to liveliness props (i.e make sure the server can respond to requests that are used to check if the server is active)
+- (LOW PRIORITY) Remove check for User-Agent
