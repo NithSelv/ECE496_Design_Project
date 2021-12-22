@@ -49,3 +49,16 @@ We plan to implement the following updates fairly soon:
 - (MEDIUM PRIORITY) Server should use a map for the `Metrics_Database` to enable faster lookup -> Binary Search
 - (LOW PRIORITY) (Additional Feature) Respond to liveliness props (i.e make sure the server can respond to requests that are used to check if the server is active)
 - (LOW PRIORITY) Remove check for User-Agent
+
+## Current To-do (winter break)
+
+- Discuss Security (localhost, check IP, encrypt, password, etc.)
+- More functionality with Prometheus (config file <http_sd_config>, Kubernetes compatibility)
+
+- Handle multiple clients (via select/pull, test with libcurl)
+- Make Request and Response static not dynamic (std::string as fallback)
+- Parsing relative http path
+- Handle case where http encoded in HEX
+- Enhance BASH script (e.g. # of connections within 10s)
+- Potentially use http Keep-Alive to check if server is runnning
+- Change metrics database (use unordered map, std::string)
