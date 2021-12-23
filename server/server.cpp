@@ -92,9 +92,9 @@ int main(int argc, char* argv[]){
     struct timeval start;
     gettimeofday(&start, NULL);
     start_time = start.tv_sec + start.tv_usec * 0.000001;
-    Metrics_Database db;
+    Metrics_Database* db = new Metrics_Database();
 
-    db_check = db.Initialize(start_time);
+    db_check = db->Initialize(start_time);
     if (db_check != 0) {
 	printf("FAILED: Unable to initialize database!\n");
         return -1;
@@ -150,6 +150,7 @@ int main(int argc, char* argv[]){
 		printf("FAILED: Accept failed!");
 		close(newfd);
 		close(sockfd);
+		delete db;
 		return -1;
     	}
 
@@ -161,6 +162,7 @@ int main(int argc, char* argv[]){
         	printf("FAILED: Could not set timeout!\n");
 		close(newfd);
 		close(sockfd);
+		delete db;
 		return -1;
 	}
 
@@ -174,6 +176,7 @@ int main(int argc, char* argv[]){
 	    printf("FAILED: Receive failed!");
 	    close(newfd);
 	    close(sockfd);
+	    delete db;
 	    return -1;
         }
 
@@ -182,7 +185,7 @@ int main(int argc, char* argv[]){
 
 	req.Parse(receive_buffer);
 
-	char * http_rep = http_error_check(&req, &rep, &db, port_num);
+	char * http_rep = http_error_check(&req, &rep, db, port_num);
 
 	//req.Print();
 	//printf("\n\n");
@@ -199,16 +202,18 @@ int main(int argc, char* argv[]){
 		printf("FAILED: Send failed!");
 		close(newfd);
 		close(sockfd);
+		delete db;
 		return -1;
 	    }
 	    total_bytes += num_bytes;
         }
 
-	db_check = db.Update(start_time);
+	db_check = db->Update(start_time);
 	if (db_check < 0) {
 	    printf("FAILED: database did not update!");
 	    close(newfd);
 	    close(sockfd);
+	    delete db;
 	    return -1;
 	}
 	//printf("One connection handled!\n");
@@ -216,6 +221,7 @@ int main(int argc, char* argv[]){
 	close(newfd);
 	
     }
+    delete db;
     close(sockfd);		
     return 0;
 }
