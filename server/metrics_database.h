@@ -14,7 +14,7 @@ class Metrics_Database {
 	std::map<std::string, std::string>::iterator it;
     public:
 	
-	//Metrics_Database() {} //?
+	Metrics_Database(); //default constructor
 
 	void Add_Metric(const char* name, char* value) {
 		mdb.insert(std::make_pair(name, value));
