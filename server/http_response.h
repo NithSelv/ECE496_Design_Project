@@ -21,27 +21,31 @@ class Http_Response {
 		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
 		return Http_Response::HeaderInvalid;
 	    }
-	    strcat(this->data, field);
-	    strcat(this->data, " : ");
+	    if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0))) {
+	    	strcat(this->data, field);
+		strcat(this->data, " : ");
+	    }
 	    strcat(this->data, value);
 	    strcat(this->data, "\r\n");
 	    this->bytes_written += strlen(field)+strlen(value)+5;
 	    return Http_Response::Success;
 	}
 
-	int Add_Body(char* body) {
-	    if ((sizeof(this->data)-bytes_written) < strlen(body)+3) {
+	int Add_Body(const char* body) {
+	    long unsigned int len = strlen(body);
+	    if ((sizeof(this->data)-bytes_written) < len+3) {
 		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
 		return Http_Response::BodyInvalid;
 	    }
 	    strcat(this->data, "\r\n");
 	    strcat(this->data, body);
-	    this->bytes_written += strlen(body)+2;
+	    this->bytes_written += len+2;
 	    return Http_Response::Success;
 	}
 
 	std::string Prepare_Http_Response() {
-	    return std::string (this->data).c_str();
+	    std::string str(this->data);
+	    return str;
 	}
 };
 

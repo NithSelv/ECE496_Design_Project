@@ -1,15 +1,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
-#include <vector>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
-#include "server.h" //for int Accept(Server& server) {
 
 //This class is used to handle the client communications
 class Client {
@@ -46,12 +45,12 @@ class Client {
 	}
 
 	//This private function allows us to set the send_buffer size dynamically
- 	void Set_Send_Buffer(std::string &str) {
-	    this->Clear_Send_Buffer(str.size()+1);
-	    for (int i = 0; i < (int)(this->send_buffer.size()); i++) {
-		this->send_buffer[i] = str[i];
+ 	void Set_Send_Buffer(std::string* str) {
+	    this->Clear_Send_Buffer(str->size()+1);
+	    for (unsigned int i = 0; i < this->send_buffer.size(); i++) {
+		this->send_buffer[i] = (*str)[i];
 	    }
-	    this->send_buffer[str.size()] = '\0'; 
+	    this->send_buffer[str->size()] = '\0'; 
 	}
 
 	//This private function lets us clear the recv buffer (can only hold a max of 4096 bytes)
@@ -70,8 +69,8 @@ class Client {
 	    this->sockfd = -1;
 	}
 	//Accept the connection and populate the client structures
-	int Accept(Server& server) {
-	    this->sockfd = accept(server.Get_Sockfd(), (struct sockaddr *)&(this->client_addr), (socklen_t *)&(this->client_addr_size));
+	int Accept(int server_sock) {
+	    this->sockfd = accept(server_sock, (struct sockaddr *)&(this->client_addr), (socklen_t *)&(this->client_addr_size));
 	    if (this->sockfd < 0) {
 		std::cout << "Failed to connect to client!" << std::endl;
 		return Client::AcceptFailed;
@@ -96,7 +95,7 @@ class Client {
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it
-	int Send(std::string &str, int timeout) {
+	int Send(std::string* str, int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Send_Timeout(timeout);
 	    this->Set_Send_Buffer(str);
@@ -106,7 +105,7 @@ class Client {
 		total_bytes += num_bytes;
 		num_bytes = send(this->sockfd, &(this->send_buffer[total_bytes]), this->send_buffer.size()-total_bytes, 0);
 	    }
-	    if (!((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK)))) {
+	    if ((num_bytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
 	    	std::cout << "Failed to send msg!" << std::endl;
 	    	close(this->sockfd);
 	    	return Client::SendFailed;
@@ -114,8 +113,9 @@ class Client {
 	    return Client::Success;
 	}
 	//Return the received message as a std::string
-	std::string Get_Recv_Msg() {
-	    return (std::string)(this->recv_buffer);
+        std::string Get_Recv_Msg() {
+	    std::string msg(this->recv_buffer);
+	    return msg;
 	}
 	//Remember to close the connection once finished
 	//Structures go out of scope so no need for memory cleanup
