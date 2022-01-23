@@ -36,12 +36,13 @@ class Http_Response {
 	    }
 	    strcat(this->data, "\r\n");
 	    strcat(this->data, body);
-	    this->bytes_written += strlen(body)+2
+	    this->bytes_written += strlen(body)+2;
 	    return Http_Response::Success;
 	}
 
 	std::string Prepare_Http_Response() {
-	    return std::string str(this->data);
+	    std::string str(this->data);
+	    return str;
 	}
 };
 

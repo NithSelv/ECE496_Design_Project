@@ -27,7 +27,7 @@ class Server {
 	    this->sockfd = -1;
 	    this->server_addr.sin_port = htons(port);
 	    this->server_addr.sin_family = AF_INET;
-	    this->server_addr.s_addr = htonl(INADDR_ANY);
+	    this->server_addr.sin_addr = htonl(INADDR_ANY);
 	    memset(server_addr.sin_zero, 0, 8);
 	}
 	//Check to make sure the input is valid and then begin to create the socket, bind it, and set it to listen
@@ -45,7 +45,7 @@ class Server {
 	    this->sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	    if (this->sockfd < 0) {
 		std::cout << "Socket Creation Failed!" << std::endl;
-		return Server::SocketCreationFailed << std::endl;
+		return Server::SocketCreationFailed;
 	    }
 	    //Bind it to the server
 	    if (bind(this->sockfd, (struct sockaddr *)&(this->server_addr), (socklen_t)sizeof(this->server_addr)) != 0) {

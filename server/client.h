@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
@@ -46,7 +47,7 @@ class Client {
 	//This private function allows us to set the send_buffer size dynamically
  	void Set_Send_Buffer(std::string &str) {
 	    this->Clear_Send_Buffer(str.size()+1);
-	    for (int i = 0; i < this->send_buffer.size(); i++) {
+	    for (unsigned int i = 0; i < this->send_buffer.size(); i++) {
 		this->send_buffer[i] = str[i];
 	    }
 	    this->send_buffer[str.size()] = '\0'; 
@@ -62,14 +63,14 @@ class Client {
 	}
     public:
 	//Some enums for error codes
-	enum Return_Codes {Success = 0, AcceptFailed = -1, TimeoutFailed = -2 ReceiveFailed = -3, SendFailed = -4};
+	enum Return_Codes {Success = 0, AcceptFailed = -1, TimeoutFailed = -2, ReceiveFailed = -3, SendFailed = -4};
 	//Set the initial sockfd to some invalid value
 	Client() {
 	    this->sockfd = -1;
 	}
 	//Accept the connection and populate the client structures
-	int Accept(Server& server) {
-	    this->sockfd = accept(server.Get_Sockfd(), (struct sockaddr *)&(this->client_addr), (socklen_t *)&(this->client_addr_size));
+	int Accept(int server_sock) {
+	    this->sockfd = accept(server_sock, (struct sockaddr *)&(this->client_addr), (socklen_t *)&(this->client_addr_size));
 	    if (this->sockfd < 0) {
 		std::cout << "Failed to connect to client!" << std::endl;
 		return Client::AcceptFailed;
@@ -97,7 +98,7 @@ class Client {
 	int Send(std::string &str, int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Send_Timeout(timeout);
-	    this->Set_Send_Buffer(&str);
+	    this->Set_Send_Buffer(str);
 	    
 	    int num_bytes = send(this->sockfd, &(this->send_buffer[0]), this->send_buffer.size(), 0);
 	    while (num_bytes > 0) {
@@ -112,8 +113,9 @@ class Client {
 	    return Client::Success;
 	}
 	//Return the received message as a std::string
-	std::string Get_Recv_Msg() {
-	    return std::string msg(this->recv_buffer);
+        std::string Get_Recv_Msg() {
+	    std::string msg(this->recv_buffer);
+	    return msg;
 	}
 	//Remember to close the connection once finished
 	//Structures go out of scope so no need for memory cleanup

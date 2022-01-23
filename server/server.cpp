@@ -95,7 +95,7 @@ int main(int argc, char* argv[]){
 	Http_Request req;
 
 	//Accept a new connection
-    	if (client.Accept(&server) < 0) {
+    	if (client.Accept(server.Get_Sockfd()) < 0) {
 	    continue;
     	}
 	//Receive the msg from the client/Prometheus
