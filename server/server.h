@@ -27,7 +27,7 @@ class Server {
 	    this->sockfd = -1;
 	    this->server_addr.sin_port = htons(port);
 	    this->server_addr.sin_family = AF_INET;
-	    this->server_addr.sin_addr = htonl(INADDR_ANY);
+	    this->server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	    memset(server_addr.sin_zero, 0, 8);
 	}
 	//Check to make sure the input is valid and then begin to create the socket, bind it, and set it to listen

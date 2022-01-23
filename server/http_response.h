@@ -21,8 +21,10 @@ class Http_Response {
 		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
 		return Http_Response::HeaderInvalid;
 	    }
-	    strcat(this->data, field);
-	    strcat(this->data, " : ");
+	    if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0))) {
+	    	strcat(this->data, field);
+		strcat(this->data, " : ");
+	    }
 	    strcat(this->data, value);
 	    strcat(this->data, "\r\n");
 	    this->bytes_written += strlen(field)+strlen(value)+5;

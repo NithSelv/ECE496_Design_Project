@@ -17,18 +17,18 @@
 #include "server.h"
 #include "globals.h"
 
-std::string http_error_check(Http_Request &req, Metrics_Database* db) {
+std::string http_error_check(Http_Request* req, Metrics_Database* db) {
     Http_Response rep;
 
-    int type = req.Find_Type();
-    char* metric = req.Find("Metric");
+    int type = req->Find_Type();
+    char* metric = req->Find_Metric();
 
     if ((type == -1) || (metric == NULL)) {		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
 	return rep.Prepare_Http_Response();
     } 
 
-    if (type != Http_Request::Http_Types::GET){		
+    if (type != Http_Request::GET){		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
 	return rep.Prepare_Http_Response();
     }
@@ -53,10 +53,10 @@ int main(int argc, char* argv[]){
     //First check to make sure that we have all 3 required arguments
     if (argc < 4) {
         std::cout << "FAILED: Not enough arguments" << std::endl;
-        return Codes::TooFewArgs;
+        return TooFewArgs;
     } else if (argc > 4) {
 	std::cout << "FAILED: Too many arguments" << std::endl;
-        return Codes::TooManyArgs;
+        return TooManyArgs;
     }
 
     /*TO BE REMOVED: This is just an object used to compute the calendar time metric
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]){
     if (db->Initialize(start.tv_sec + start.tv_usec * 0.000001) != 0) {
 	std::cout << "FAILED: Unable to initialize database!" << std::endl;
 	delete db;
-        return Codes::DatabaseFailed;
+        return DatabaseFailed;
     }
 
     //Assign the arguments to the appropiate variables, we will use them later
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]){
     if (server.Start() < 0) {
 	std::cout << "Server failed to start!" << std::endl;
 	delete db;
-	return Codes::ServerFailed;
+	return ServerFailed;
     }
 
     //Handle each connection by the following
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]){
 	    continue;
 	}
 	//Parse the std::string into the http request object
-	req.Parse(client.Get_Recv_Msg().c_str());
+	req.Parse((char *)client.Get_Recv_Msg().c_str());
 
 	//Verify that the http request is valid and then generate a std::string for the response
 	std::string http_rep = http_error_check(&req, db);

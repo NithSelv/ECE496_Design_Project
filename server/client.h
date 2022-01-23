@@ -45,12 +45,12 @@ class Client {
 	}
 
 	//This private function allows us to set the send_buffer size dynamically
- 	void Set_Send_Buffer(std::string &str) {
-	    this->Clear_Send_Buffer(str.size()+1);
+ 	void Set_Send_Buffer(std::string* str) {
+	    this->Clear_Send_Buffer(str->size()+1);
 	    for (unsigned int i = 0; i < this->send_buffer.size(); i++) {
-		this->send_buffer[i] = str[i];
+		this->send_buffer[i] = (*str)[i];
 	    }
-	    this->send_buffer[str.size()] = '\0'; 
+	    this->send_buffer[str->size()] = '\0'; 
 	}
 
 	//This private function lets us clear the recv buffer (can only hold a max of 4096 bytes)
@@ -95,7 +95,7 @@ class Client {
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it
-	int Send(std::string &str, int timeout) {
+	int Send(std::string* str, int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Send_Timeout(timeout);
 	    this->Set_Send_Buffer(str);
