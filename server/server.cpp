@@ -20,10 +20,10 @@
 std::string http_error_check(Http_Request* req, Metrics_Database* db) {
     Http_Response rep;
 
-    int type = req->Find_Type();
-    char* metric = req->Find_Metric();
+    int type = req->getType();
+    const char* metric = req->getMetric();
 
-    if ((type != Http_Request::GET) || (metric == NULL)){		
+    if (type != Http_Request::GET){		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
 	return rep.Prepare_Http_Response();
     }
@@ -35,6 +35,7 @@ std::string http_error_check(Http_Request* req, Metrics_Database* db) {
 
     rep.Add_Header_Field("", "HTTP/1.1 200 OK");
     rep.Add_Header_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    //Need to add updated metrics body code here
     //char * body = db->Prepare_All_Metrics_Body();
     char body[16] = "";
     rep.Add_Body(body);

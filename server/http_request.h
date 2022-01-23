@@ -21,9 +21,6 @@ class Http_Request {
 	}
 	//Take a string literal as the http request and get the desired fields
 	void Parse(char* req) {
-	    this->Type = Http_Request::NA;
-	    memset(this->Metric, 0, sizeof(this->Metric));
-	    memset(this->Connection, 0, sizeof(this->Connection));
 	    long unsigned int num_chars = strcspn(req, "\r");
 	    char* starter = req;
 	    char* last_line = strstr(req, "\r\n\r\n");
@@ -77,13 +74,13 @@ class Http_Request {
 	    }
 	}
 	//These functions are used to access the stored fields
-	int Find_Type() {
+	int getType() const {
 	    return this->Type;
 	}
-	char * Find_Metric() {
+	const char * getMetric() const {
 	    return this->Metric;
 	}
-	char * Find_Connection() {
+	const char * getConnection() const {
 	    return this->Connection;
 	}
 };
