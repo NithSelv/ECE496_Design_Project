@@ -1,105 +1,51 @@
 #include <cstdio>
 #include <cstring>
-#include "node.h"
+#include <iostream>
 
 //This is a class that is used to prepare the HTTP Response by adding http headers and the body and then setting up the correct format
 class Http_Response {
     private:
-	Node data;
-	Node* last;
-	char * send_buffer;
-	int buffer_size;
+	char data[4096];
+	int bytes_written;
     public:
+	//These are the enums for all the error codes that this class' methods can return
+	enum Return_Codes {Success = 0, HeaderInvalid = -1, BodyInvalid = -2};
 	Http_Response() {
-	    this->data.field = NULL;
-	    this->data.value = NULL;
-	    this->data.next = NULL;
-	    this->last = NULL;
-	    this->send_buffer = NULL;
-	    this->buffer_size = 0;
+	    memset(this->data, 0, sizeof(this->data));
+	    this->bytes_written = 0;
 	}
 
-	void Add_Field(const char* field, const char* value) {
-	    if (this->last == NULL) {
-		this->last = &(this->data);
-	    } else {
-		this->last->next = new Node();
-		this->last = this->last->next;
-		this->last->next = NULL;
+	int Add_Header_Field(const char* field, const char* value) {
+	    
+	    if ((sizeof(this->data)-bytes_written) < strlen(field)+strlen(value)+6) {
+		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
+		return Http_Response::HeaderInvalid;
 	    }
-	    this->last->field = (char *)malloc(sizeof(char) * (strlen(field) + 1));
-	    this->last->value = (char *)malloc(sizeof(char) * (strlen(value) + 1));
-	    memset((void*)this->last->field, 0, sizeof(this->last->field));
-	    memset((void*)this->last->value, 0, sizeof(this->last->value));
-	    strcpy(this->last->field, field);
-	    strcpy(this->last->value, value);
-	    if (strcmp(this->last->field, "Header") == 0) {
-		this->buffer_size += strlen(this->last->value) + 2;
-	    } else if  (strcmp(this->last->field, "Body") == 0) {
-		this->buffer_size += strlen(this->last->value);
-	    } else {
-		this->buffer_size += strlen(this->last->field) + strlen(this->last->value) + 4;
+	    if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0))) {
+	    	strcat(this->data, field);
+		strcat(this->data, " : ");
 	    }
-	    this->buffer_size += 2;
+	    strcat(this->data, value);
+	    strcat(this->data, "\r\n");
+	    this->bytes_written += strlen(field)+strlen(value)+5;
+	    return Http_Response::Success;
 	}
 
-	void Print() {
-	    Node* current = &(this->data);
-	    printf("Here is the sent HTTP Response: \n");
-	    while (current != NULL) {
-		printf("%s: %s\n", current->field, current->value);
-		current = current->next;
+	int Add_Body(const char* body) {
+	    long unsigned int len = strlen(body);
+	    if ((sizeof(this->data)-bytes_written) < len+3) {
+		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
+		return Http_Response::BodyInvalid;
 	    }
+	    strcat(this->data, "\r\n");
+	    strcat(this->data, body);
+	    this->bytes_written += len+2;
+	    return Http_Response::Success;
 	}
 
-	char* Prepare_Http_Response() {
-	    Node* current = &(this->data);
-	    this->send_buffer = (char *)malloc(sizeof(char) * (this->buffer_size + 1));
-	    memset((void*)this->send_buffer, 0, sizeof(this->send_buffer));
-	    int ending = 0;
-	    while (current != NULL) {
-		if (strcmp(current->field, "Header") == 0) {
-		    strcpy(this->send_buffer, current->value);
-		    strcat(this->send_buffer, "\r\n");
-		} else if (strcmp(current->field, "Body") == 0) {
-		    strcat(this->send_buffer, current->value);
-		} else {
-		    strcat(this->send_buffer, current->field);
-		    strcat(this->send_buffer, ": ");
-		    strcat(this->send_buffer, current->value);
-		    strcat(this->send_buffer, "\r\n");
-		}
-		if (((current->next != NULL) && (strcmp(current->next->field, "Body") == 0)) || ((current->next == NULL) && (ending == 0))) {
-		    strcat(this->send_buffer, "\r\n");
-		    ending = 1;
-		}
-		current = current->next;
-	    }
-	    return (this->send_buffer);
-	}
-
-	
-
-	~Http_Response() {
-	    this->last = NULL;
-	    delete[] this->send_buffer;
-	    delete this->data.field;
-	    this->data.field = NULL;
-	    delete this->data.value;
-	    this->data.value = NULL;
-	    this->send_buffer = NULL;
-	    this->buffer_size = 0;
-	    Node* node = this->data.next;
-	    while (node != NULL) {
-		delete node->field;
-		node->field = NULL;
-		delete node->value;
-		node->value = NULL;
-		Node* temp = node;
-		node = node->next;
-		delete temp;
-	    }
-	    this->buffer_size = 0;
+	std::string Prepare_Http_Response() {
+	    std::string str(this->data);
+	    return str;
 	}
 };
 
