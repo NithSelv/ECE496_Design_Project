@@ -23,12 +23,7 @@ std::string http_error_check(Http_Request* req, Metrics_Database* db) {
     int type = req->Find_Type();
     char* metric = req->Find_Metric();
 
-    if ((type == -1) || (metric == NULL)) {		
-	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
-	return rep.Prepare_Http_Response();
-    } 
-
-    if (type != Http_Request::GET){		
+    if ((type != Http_Request::GET) || (metric == NULL)){		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
 	return rep.Prepare_Http_Response();
     }
@@ -40,10 +35,11 @@ std::string http_error_check(Http_Request* req, Metrics_Database* db) {
 
     rep.Add_Header_Field("", "HTTP/1.1 200 OK");
     rep.Add_Header_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    char * body = db->Prepare_All_Metrics_Body();
+    //char * body = db->Prepare_All_Metrics_Body();
+    char body[16] = "";
     rep.Add_Body(body);
-    delete body;
-    body = NULL;
+    //delete body;
+    //body = NULL;
     return rep.Prepare_Http_Response();
 }
 

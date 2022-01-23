@@ -105,7 +105,7 @@ class Client {
 		total_bytes += num_bytes;
 		num_bytes = send(this->sockfd, &(this->send_buffer[total_bytes]), this->send_buffer.size()-total_bytes, 0);
 	    }
-	    if (!((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK)))) {
+	    if ((num_bytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
 	    	std::cout << "Failed to send msg!" << std::endl;
 	    	close(this->sockfd);
 	    	return Client::SendFailed;
