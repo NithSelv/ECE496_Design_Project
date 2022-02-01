@@ -9,15 +9,17 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <time.h>
-#include "node.h"
+#include <vector>
 #include "metrics_database.h"
 #include "http_request.h"
 #include "http_response.h"
 #include "client.h"
 #include "server.h"
-#include "globals.h"
 
-std::string http_error_check(Http_Request* req, Metrics_Database* db) {
+//These constants represent the various return codes that our main function can return.
+enum Codes {Success = 0, TooFewArgs = -1, TooManyArgs = -2, DatabaseFailed = -3, ServerFailed = -4};
+
+std::vector<char> http_error_check(Http_Request* req, Metrics_Database* db) {
     Http_Response rep;
 
     int type = req->getType();
@@ -25,22 +27,19 @@ std::string http_error_check(Http_Request* req, Metrics_Database* db) {
 
     if (type != Http_Request::GET){		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
+	rep.Add_Body("");
 	return rep.Prepare_Http_Response();
     }
 
     if ((strlen(metric) != strlen("/metrics")) || (strcmp(metric, "/metrics") != 0)) {		
 	rep.Add_Header_Field("", "HTTP/1.1 404 Not Found");
+	rep.Add_Body("");
 	return rep.Prepare_Http_Response();
     }
 
     rep.Add_Header_Field("", "HTTP/1.1 200 OK");
     rep.Add_Header_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    //Need to add updated metrics body code here
-    //char * body = db->Prepare_All_Metrics_Body();
-    char body[16] = "";
-    rep.Add_Body(body);
-    //delete body;
-    //body = NULL;
+    rep.Add_Body(db->Prepare_All_Metrics_Body());
     return rep.Prepare_Http_Response();
 }
 
@@ -100,13 +99,11 @@ int main(int argc, char* argv[]){
 	    continue;
 	}
 	//Parse the std::string into the http request object
-	req.Parse((char *)client.Get_Recv_Msg().c_str());
+	req.Parse(client.getRecvMsg());
 
-	//Verify that the http request is valid and then generate a std::string for the response
-	std::string http_rep = http_error_check(&req, db);
-
-	//Send back the response
-	if (client.Send(&http_rep, timeout) < 0) {
+	//Verify that the http request is valid and then
+	//send back the response
+	if (client.Send(http_error_check(&req, db), timeout) < 0) {
 	    continue;
 	}
 

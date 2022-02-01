@@ -20,7 +20,6 @@ class Client {
 	struct timeval send_timer;
     	socklen_t client_addr_size;
 	char recv_buffer[4096];
-	std::vector<char> send_buffer;
 
 	//This private function allows us to set the timeout for receiving messages.
 	int Set_Recv_Timeout(int timeout) {
@@ -44,22 +43,9 @@ class Client {
 	    return Client::Success;
 	}
 
-	//This private function allows us to set the send_buffer size dynamically
- 	void Set_Send_Buffer(std::string* str) {
-	    this->Clear_Send_Buffer(str->size()+1);
-	    for (unsigned int i = 0; i < this->send_buffer.size(); i++) {
-		this->send_buffer[i] = (*str)[i];
-	    }
-	    this->send_buffer[str->size()] = '\0'; 
-	}
-
 	//This private function lets us clear the recv buffer (can only hold a max of 4096 bytes)
 	void Clear_Recv_Buffer() {
 	    memset(this->recv_buffer, 0, sizeof(this->recv_buffer));
-	}
-	//This private function lets us clear the send buffer and resize it accordingly to the size of the msg to be sent. 
-	void Clear_Send_Buffer(int size) {
-	    this->send_buffer.resize(size, '\0');
 	}
     public:
 	//Some enums for error codes
@@ -95,15 +81,14 @@ class Client {
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it
-	int Send(std::string* str, int timeout) {
+	int Send(std::vector<char> send_buffer, int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Send_Timeout(timeout);
-	    this->Set_Send_Buffer(str);
 	    
-	    int num_bytes = send(this->sockfd, &(this->send_buffer[0]), this->send_buffer.size(), 0);
+	    int num_bytes = send(this->sockfd, &(send_buffer[0]), send_buffer.size(), 0);
 	    while (num_bytes > 0) {
 		total_bytes += num_bytes;
-		num_bytes = send(this->sockfd, &(this->send_buffer[total_bytes]), this->send_buffer.size()-total_bytes, 0);
+		num_bytes = send(this->sockfd, &(send_buffer[total_bytes]), send_buffer.size()-total_bytes, 0);
 	    }
 	    if ((num_bytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK))) {
 	    	std::cout << "Failed to send msg!" << std::endl;
@@ -112,10 +97,9 @@ class Client {
             }
 	    return Client::Success;
 	}
-	//Return the received message as a std::string
-        std::string Get_Recv_Msg() {
-	    std::string msg(this->recv_buffer);
-	    return msg;
+	//Return the received message 
+        char* getRecvMsg() {
+	    return this->recv_buffer;
 	}
 	//Remember to close the connection once finished
 	//Structures go out of scope so no need for memory cleanup
