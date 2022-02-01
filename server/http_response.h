@@ -29,7 +29,6 @@ class Http_Response {
 	    this->msg.push_back('\r');
 	    this->msg.push_back('\n');
 	    this->msg.insert(this->msg.end(), body.begin(), body.end());
-	    this->msg.push_back('\0');
 	}
 
 	std::vector<char> Prepare_Http_Response() {
