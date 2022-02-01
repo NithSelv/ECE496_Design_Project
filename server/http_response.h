@@ -1,51 +1,39 @@
 #include <cstdio>
 #include <cstring>
+#include <vector>
 #include <iostream>
 
 //This is a class that is used to prepare the HTTP Response by adding http headers and the body and then setting up the correct format
 class Http_Response {
     private:
-	char data[4096];
+	std::vector<char> msg;
 	int bytes_written;
     public:
-	//These are the enums for all the error codes that this class' methods can return
-	enum Return_Codes {Success = 0, HeaderInvalid = -1, BodyInvalid = -2};
 	Http_Response() {
-	    memset(this->data, 0, sizeof(this->data));
-	    this->bytes_written = 0;
+	    this->msg.clear(); 
 	}
 
-	int Add_Header_Field(const char* field, const char* value) {
-	    
-	    if ((sizeof(this->data)-bytes_written) < strlen(field)+strlen(value)+6) {
-		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
-		return Http_Response::HeaderInvalid;
-	    }
+	void Add_Header_Field(const char* field, const char* value) {
 	    if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0))) {
-	    	strcat(this->data, field);
-		strcat(this->data, " : ");
+		this->msg.insert(this->msg.end(), field, field+strlen(field));
+		this->msg.push_back(' ');
+		this->msg.push_back(':');
+		this->msg.push_back(' ');	    	
 	    }
-	    strcat(this->data, value);
-	    strcat(this->data, "\r\n");
-	    this->bytes_written += strlen(field)+strlen(value)+5;
-	    return Http_Response::Success;
+	    this->msg.insert(this->msg.end(), value, value+strlen(value));
+	    this->msg.push_back('\r');
+	    this->msg.push_back('\n');
 	}
 
-	int Add_Body(const char* body) {
-	    long unsigned int len = strlen(body);
-	    if ((sizeof(this->data)-bytes_written) < len+3) {
-		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
-		return Http_Response::BodyInvalid;
-	    }
-	    strcat(this->data, "\r\n");
-	    strcat(this->data, body);
-	    this->bytes_written += len+2;
-	    return Http_Response::Success;
+	void Add_Body(std::string body) {
+	    this->msg.push_back('\r');
+	    this->msg.push_back('\n');
+	    this->msg.insert(this->msg.end(), body.begin(), body.end());
+	    this->msg.push_back('\0');
 	}
 
-	std::string Prepare_Http_Response() {
-	    std::string str(this->data);
-	    return str;
+	std::vector<char> Prepare_Http_Response() {
+	    return this->msg;
 	}
 };
 
