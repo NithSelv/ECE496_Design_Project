@@ -23,7 +23,7 @@ std::vector<char> http_error_check(Http_Request* req, Metrics_Database* db) {
     Http_Response rep;
 
     int type = req->getType();
-    const char* metric = req->getMetric();
+    std::string metric(req->getMetric());
 
     if (type != Http_Request::GET){		
 	rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
@@ -31,7 +31,7 @@ std::vector<char> http_error_check(Http_Request* req, Metrics_Database* db) {
 	return rep.Prepare_Http_Response();
     }
 
-    if ((strlen(metric) != strlen("/metrics")) || (strcmp(metric, "/metrics") != 0)) {		
+    if (metric.find("/metrics\0") == std::string::npos) {		
 	rep.Add_Header_Field("", "HTTP/1.1 404 Not Found");
 	rep.Add_Body("");
 	return rep.Prepare_Http_Response();
@@ -100,24 +100,39 @@ int main(int argc, char* argv[]){
     	if (client.Accept(server.getSockfd()) < 0) {
 	    continue;
     	}
-	//Receive the msg from the client/Prometheus
-	if (client.Receive(timeout) < 0) {
-	    continue;
-	}
-	//Parse the std::string into the http request object
-	if (req.Parse(client.getRecvMsg()) < 0) {
-	    client.Close();
-	    continue;
-	};
 
-	//Verify that the http request is valid and then
-	//send back the response
-	if (client.Send(http_error_check(&req, db), timeout) < 0) {
-	    continue;
+	int keep_alive = 1;
+
+	while (keep_alive > 0) {
+
+		//Receive the msg from the client/Prometheus
+		if (client.Receive(timeout) < 0) {
+			keep_alive = -1;
+	    		break;
+		}
+		//Parse the std::string into the http request object
+		if (req.Parse(client.getRecvMsg()) < 0) {
+			keep_alive = 0;
+	    		break;
+		}
+		keep_alive = 0;
+		//Check if we need to keep this connection alive for another request
+		if ((strlen(req.getConnection()) == strlen("keep-alive")) && (strcmp(req.getConnection(), "keep-alive") == 0)) {
+			keep_alive = 1;
+		} 
+
+		//Verify that the http request is valid and then
+		//send back the response
+		if (client.Send(http_error_check(&req, db), timeout) < 0) {
+			keep_alive = -1;
+	    		break;
+		}
 	}
 
 	//Close the client connection 
-	client.Close();	
+	if (keep_alive == 0) {
+		client.Close();
+	}	
     }		
 }
 
