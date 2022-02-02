@@ -57,8 +57,8 @@ We plan to implement the following updates fairly soon:
 
 - Handle multiple clients (via select/pull, test with libcurl)
 - Make Request and Response static not dynamic (std::string as fallback) COMPLETED
-- Parsing relative http path
+- Parsing relative http path COMPLETED
 - Handle case where http encoded in HEX
 - Enhance BASH script (e.g. # of connections within 10s)
-- Potentially use http Keep-Alive to check if server is runnning
+- Potentially use http Keep-Alive to check if server is runnning COMPLETED
 - Change metrics database (use unordered map, std::string) COMPLETED
