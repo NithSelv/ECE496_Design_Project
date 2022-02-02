@@ -10,27 +10,27 @@
 class Metrics_Database {
     private:
 	std::map<std::string, std::string> mdb;
-	std::map<std::string, std::string>::iterator it;
     public:
 
 	void Add_Metric(const char* name, char* value) {
 		this->mdb.insert(std::make_pair(name, value));
 	}
 
-	std::string Find_Metric(char* name) { //changed return type from char* (unused so far)
-		this->it = mdb.find(name);
-		if (this->it != mdb.end()) {
-			return this->it->second; //found
+	std::string Find_Metric(const char* name) { //changed return type from char* (unused so far)
+		std::map<std::string, std::string>::iterator it = mdb.find(name);
+		if (it != mdb.end()) {
+			return it->second; //found
 		} else {
-			return NULL; // not found
+			std::string s;
+			s.clear();
+			return s; // not found
 		}
 	}
 
 	int Set_Metric(const char* name, char* value) {
-	    this->it = this->mdb.find(name);
-	    if (this->it != this->mdb.end()) { //found
-		    this->mdb.erase(it);
-		    this->mdb.insert(std::make_pair(name, value));
+	    std::map<std::string, std::string>::iterator it = this->mdb.find(name);
+	    if (it != this->mdb.end()) { //found
+		    it->second = value;
 		    return 0;
 	    } else {
 		    return -1;
@@ -39,18 +39,20 @@ class Metrics_Database {
 
 	std::string Prepare_All_Metrics_Body() { //changed return type from char* (used in server.cpp)
 		std::string msg;
-		for (this->it=this->mdb.begin(); this->it!=this->mdb.end(); ++it) {
-			msg.append(this->it->first);
+		std::map<std::string, std::string>::iterator it;
+		for (it=this->mdb.begin(); it!=this->mdb.end(); ++it) {
+			msg.append(it->first);
 			msg.append(" ");
-			msg.append(this->it->second);
+			msg.append(it->second);
 			msg.append("\n");
 		}
 		return msg;
 	}
 
 	void Print() {
-		for (this->it=this->mdb.begin(); this->it!=this->mdb.end(); ++it) {
-			std::cout << this->it->first << " => " << this->it->second << std::endl;
+		std::map<std::string, std::string>::iterator it;
+		for (it=this->mdb.begin(); it!=this->mdb.end(); ++it) {
+			std::cout << it->first << " => " << it->second << std::endl;
 		}
 	}
 
