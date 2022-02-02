@@ -42,17 +42,13 @@ class Client {
 	    }
 	    return Client::Success;
 	}
-
-	//This private function lets us clear the recv buffer (can only hold a max of 4096 bytes)
-	void Clear_Recv_Buffer() {
-	    memset(this->recv_buffer, 0, sizeof(this->recv_buffer));
-	}
     public:
 	//Some enums for error codes
 	enum Return_Codes {Success = 0, AcceptFailed = -1, TimeoutFailed = -2, ReceiveFailed = -3, SendFailed = -4};
 	//Set the initial sockfd to some invalid value
 	Client() {
 	    this->sockfd = -1;
+	    this->recv_buffer[0] = '\0';
 	}
 	//Accept the connection and populate the client structures
 	int Accept(int server_sock) {
@@ -67,10 +63,13 @@ class Client {
 	int Receive(int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Recv_Timeout(timeout);
-	    this->Clear_Recv_Buffer();
 	    int num_bytes = recv(this->sockfd, this->recv_buffer, sizeof(this->recv_buffer)-1, 0);
 	    while (num_bytes > 0) {
 		total_bytes += num_bytes;
+		if (total_bytes >= 4095) {
+		    num_bytes = -1;
+		    continue;
+		}
 		num_bytes = recv(this->sockfd, &(this->recv_buffer[total_bytes]), sizeof(this->recv_buffer)-total_bytes-1, 0);
 	    }
 	    if (!((num_bytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK)))) {
@@ -78,6 +77,7 @@ class Client {
 	    	close(this->sockfd);
 	    	return Client::ReceiveFailed;
             }
+	    this->recv_buffer[total_bytes] = '\0';
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it
