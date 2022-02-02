@@ -85,13 +85,19 @@ int main(int argc, char* argv[]){
 
     //Handle each connection by the following
     while(1) {
+
+	//Update the database 
+	if (db->Update(start.tv_sec + start.tv_usec * 0.000001) < 0) {
+	    std::cout << "FAILED: database did not update!" << std::endl;
+	}
+
 	//This object is used for server-client communications
 	Client client; 
 	//This object is used for handling the parsing of the HTTP Request
 	Http_Request req;
 
 	//Accept a new connection
-    	if (client.Accept(server.Get_Sockfd()) < 0) {
+    	if (client.Accept(server.getSockfd()) < 0) {
 	    continue;
     	}
 	//Receive the msg from the client/Prometheus
@@ -99,17 +105,15 @@ int main(int argc, char* argv[]){
 	    continue;
 	}
 	//Parse the std::string into the http request object
-	req.Parse(client.getRecvMsg());
+	if (req.Parse(client.getRecvMsg()) < 0) {
+	    client.Close();
+	    continue;
+	};
 
 	//Verify that the http request is valid and then
 	//send back the response
 	if (client.Send(http_error_check(&req, db), timeout) < 0) {
 	    continue;
-	}
-
-	//Update the database 
-	if (db->Update(start.tv_sec + start.tv_usec * 0.000001) < 0) {
-	    std::cout << "FAILED: database did not update!" << std::endl;
 	}
 
 	//Close the client connection 

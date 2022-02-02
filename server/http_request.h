@@ -13,23 +13,29 @@ class Http_Request {
     public:
 	//Enums for the possible types of Http Requests
 	enum Http_Types {GET = 0, HEAD = 1, POST = 2, PUT = 3, DELETE = 4, PATCH = 5, NA = -1};
+	enum Parse_Error {Invalid_Request = -1, Success = 0};
 	//Initialize all the fields to NULL
 	Http_Request() {
 	    this->Type = Http_Request::NA;
-	    memset(this->Metric, 0, sizeof(this->Metric));
-	    memset(this->Connection, 0, sizeof(this->Connection));
+	    this->Metric[0] = '\0';
+	    this->Connection[0] = '\0';
 	}
 	//Take a string literal as the http request and get the desired fields
-	void Parse(char* req) {
+	int Parse(char* req) {
 	    long unsigned int num_chars = strcspn(req, "\r");
 	    char* starter = req;
 	    char* last_line = strstr(req, "\r\n\r\n");
+	    if (last_line == NULL) {
+		std::cout << "Error: Received a malformed request!" << std::endl; 
+		return Http_Request::Invalid_Request;
+	    }
 	    char first_header[64];
+	    char* saveptr;
 	    char type[16];
 	    memset((void*)first_header, 0, sizeof(first_header));
 	    memset((void*)type, 0, sizeof(type));
 	    strncpy(first_header, req, std::min(num_chars, sizeof(first_header)-1));
-	    char* arg = strtok(first_header, " ");
+	    char* arg = strtok_r((char *)first_header, " ", (char **)&saveptr);
 	    int i = 0;
 	    while ((arg != NULL) && (i < 3)) {
 		if (i == 0) {
@@ -52,7 +58,7 @@ class Http_Request {
 		} else if (i == 1) {
 	 	    strncpy(this->Metric, arg, std::min(strlen(arg)+1, sizeof(this->Metric)-1));
 		}
-		arg = strtok(NULL, " ");
+		arg = strtok_r(NULL, " ", (char **)&saveptr);
 		i++;
 	    }
 
@@ -72,6 +78,7 @@ class Http_Request {
 		}
 		starter += (num_chars + 2);
 	    }
+	    return Http_Request::Success;
 	}
 	//These functions are used to access the stored fields
 	int getType() const {

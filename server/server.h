@@ -63,7 +63,7 @@ class Server {
 
 	}
 	//Get the sockfd
-	int Get_Sockfd() {
+	int getSockfd() {
 	    return this->sockfd;
 	}
 };
