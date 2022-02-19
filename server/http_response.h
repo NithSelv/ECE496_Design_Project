@@ -1,51 +1,44 @@
 #include <cstdio>
 #include <cstring>
+#include <vector>
 #include <iostream>
 
 //This is a class that is used to prepare the HTTP Response by adding http headers and the body and then setting up the correct format
-class Http_Response {
-    private:
-	char data[4096];
-	int bytes_written;
-    public:
-	//These are the enums for all the error codes that this class' methods can return
-	enum Return_Codes {Success = 0, HeaderInvalid = -1, BodyInvalid = -2};
-	Http_Response() {
-	    memset(this->data, 0, sizeof(this->data));
-	    this->bytes_written = 0;
-	}
+class Http_Response
+   {
+private:
+   std::vector<char> _msg;
+   //int bytes_written; // unused
+   
+public:
+   Http_Response()
+      {
+      this->_msg.clear();
+      }
 
-	int Add_Header_Field(const char* field, const char* value) {
-	    
-	    if ((sizeof(this->data)-bytes_written) < strlen(field)+strlen(value)+6) {
-		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
-		return Http_Response::HeaderInvalid;
-	    }
-	    if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0))) {
-	    	strcat(this->data, field);
-		strcat(this->data, " : ");
-	    }
-	    strcat(this->data, value);
-	    strcat(this->data, "\r\n");
-	    this->bytes_written += strlen(field)+strlen(value)+5;
-	    return Http_Response::Success;
-	}
+   void Add_Header_Field(const char* field, const char* value)
+      {
+      if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0)))
+         {
+         this->_msg.insert(this->_msg.end(), field, field+strlen(field));
+         this->_msg.push_back(' ');
+         this->_msg.push_back(':');
+         this->_msg.push_back(' ');
+         }
+      this->_msg.insert(this->_msg.end(), value, value+strlen(value));
+      this->_msg.push_back('\r');
+      this->_msg.push_back('\n');
+      }
 
-	int Add_Body(const char* body) {
-	    long unsigned int len = strlen(body);
-	    if ((sizeof(this->data)-bytes_written) < len+3) {
-		std::cout << "Failed: There is not enough buffer space to process this response!" << std::endl;
-		return Http_Response::BodyInvalid;
-	    }
-	    strcat(this->data, "\r\n");
-	    strcat(this->data, body);
-	    this->bytes_written += len+2;
-	    return Http_Response::Success;
-	}
+   void Add_Body(std::string body)
+      {
+      this->_msg.push_back('\r');
+      this->_msg.push_back('\n');
+      this->_msg.insert(this->_msg.end(), body.begin(), body.end());
+      }
 
-	std::string Prepare_Http_Response() {
-	    std::string str(this->data);
-	    return str;
-	}
-};
-
+   std::vector<char> Prepare_Http_Response()
+      {
+      return this->_msg;
+      }
+   };
