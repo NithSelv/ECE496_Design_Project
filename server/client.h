@@ -79,7 +79,10 @@ class Client {
 	    	return Client::ReceiveFailed;
             }
 	    this->recv_buffer[total_bytes] = '\0';
-	    printf("%02x%02x", this->recv_buffer[total_bytes-2], this->recv_buffer[total_bytes-1]);
+	    if (total_bytes == 0) {
+		close(this->sockfd);
+	    	return Client::ReceiveFailed;
+	    }
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it
