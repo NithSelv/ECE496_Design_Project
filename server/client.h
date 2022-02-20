@@ -63,6 +63,7 @@ class Client {
 	int Receive(int timeout) {
 	    int total_bytes = 0;
 	    this->Set_Recv_Timeout(timeout);
+	    memset(this->recv_buffer, 0, sizeof(this->recv_buffer)); 
 	    int num_bytes = recv(this->sockfd, this->recv_buffer, sizeof(this->recv_buffer)-1, 0);
 	    while (num_bytes > 0) {
 		total_bytes += num_bytes;
@@ -78,6 +79,7 @@ class Client {
 	    	return Client::ReceiveFailed;
             }
 	    this->recv_buffer[total_bytes] = '\0';
+	    printf("%02x%02x", this->recv_buffer[total_bytes-2], this->recv_buffer[total_bytes-1]);
 	    return Client::Success;
 	}
 	//Add a timeout for sending messages and send it

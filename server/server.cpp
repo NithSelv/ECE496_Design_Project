@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/poll.h>
 #include <netinet/in.h>
 #include <time.h>
 #include <vector>
@@ -44,13 +45,14 @@ std::vector<char> http_error_check(Http_Request* req, Metrics_Database* db) {
 }
 
 /*This is the main function that runs the server code, it takes in 3 arguments
-1: port number, 2: number of connections that can be handled, 3: how long the server should wait for a connection's request before timing out (sec)*/
+1: port number, 2: number of connections that can be handled, 3: how long the server should wait for a connection's request before timing out (sec),
+4: number of threads, 5: number of fds*/
 int main(int argc, char* argv[]){
     //First check to make sure that we have all 3 required arguments
-    if (argc < 4) {
+    if (argc < 6) {
         std::cout << "FAILED: Not enough arguments" << std::endl;
         return TooFewArgs;
-    } else if (argc > 4) {
+    } else if (argc > 6) {
 	std::cout << "FAILED: Too many arguments" << std::endl;
         return TooManyArgs;
     }
@@ -74,6 +76,8 @@ int main(int argc, char* argv[]){
     int port = atoi(argv[1]);
     int num_connections = atoi(argv[2]);
     int timeout = atoi(argv[3]);
+    int num_threads = atoi(argv[4]);
+    int num_fds = atoi(argv[5]);
 
     //Start the server 
     Server server = Server(port, num_connections);
@@ -86,15 +90,8 @@ int main(int argc, char* argv[]){
     //Handle each connection by the following
     while(1) {
 
-	//Update the database 
-	if (db->Update(start.tv_sec + start.tv_usec * 0.000001) < 0) {
-	    std::cout << "FAILED: database did not update!" << std::endl;
-	}
-
 	//This object is used for server-client communications
 	Client client; 
-	//This object is used for handling the parsing of the HTTP Request
-	Http_Request req;
 
 	//Accept a new connection
     	if (client.Accept(server.getSockfd()) < 0) {
@@ -105,25 +102,42 @@ int main(int argc, char* argv[]){
 
 	while (keep_alive > 0) {
 
+		//Update the database 
+		if (db->Update(start.tv_sec + start.tv_usec * 0.000001) < 0) {
+	    		std::cout << "FAILED: database did not update!" << std::endl;
+		}
+
+		//This object is used for handling the parsing of the HTTP Request
+		Http_Request req;
+
+		int check = client.Receive(timeout);
+
 		//Receive the msg from the client/Prometheus
-		if (client.Receive(timeout) < 0) {
+		if (check < 0) {
 			keep_alive = -1;
 	    		break;
 		}
+		char* data = client.getRecvMsg();
+
 		//Parse the std::string into the http request object
-		if (req.Parse(client.getRecvMsg()) < 0) {
+		if (req.Parse(data) < 0) {
 			keep_alive = 0;
 	    		break;
 		}
 		keep_alive = 0;
 		//Check if we need to keep this connection alive for another request
-		if ((strlen(req.getConnection()) == strlen("keep-alive")) && (strcmp(req.getConnection(), "keep-alive") == 0)) {
+
+		const char* connection = req.getConnection();
+		if (strcmp(connection, "keep-alive") == 0) {
 			keep_alive = 1;
 		} 
 
 		//Verify that the http request is valid and then
 		//send back the response
-		if (client.Send(http_error_check(&req, db), timeout) < 0) {
+
+		std::vector<char> t = http_error_check(&req, db);
+
+		if (client.Send(t, timeout) < 0) {
 			keep_alive = -1;
 	    		break;
 		}
