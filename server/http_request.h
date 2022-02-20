@@ -1,9 +1,31 @@
+/*******************************************************************************
+ * Copyright (c) 2000, 2022 IBM Corp. and others
+ *
+ * This program and the accompanying materials are made available under
+ * the terms of the Eclipse Public License 2.0 which accompanies this
+ * distribution and is available at https://www.eclipse.org/legal/epl-2.0/
+ * or the Apache License, Version 2.0 which accompanies this distribution and
+ * is available at https://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * This Source Code may also be made available under the following
+ * Secondary Licenses when the conditions for such availability set
+ * forth in the Eclipse Public License, v. 2.0 are satisfied: GNU
+ * General Public License, version 2 with the GNU Classpath
+ * Exception [1] and GNU General Public License, version 2 with the
+ * OpenJDK Assembly Exception [2].
+ *
+ * [1] https://www.gnu.org/software/classpath/license.html
+ * [2] http://openjdk.java.net/legal/assembly-exception.html
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
+ *******************************************************************************/
+
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
 
 // This class is used to parse the HTTP Request and query for results
-class Http_Request
+class HttpRequest
    {
 // These are the fields that we are interested in
 // We do not store the values for all fields
@@ -14,52 +36,52 @@ private:
 
 public:
    // Enums for the possible types of Http Requests
-   enum Http_Types {GET = 0, HEAD = 1, POST = 2, PUT = 3, DELETE = 4, PATCH = 5, NA = -1};
-   enum Parse_Error {Invalid_Request = -1, Success = 0};
+   enum HttpTypes {httpGet = 0, httpHead = 1, httpPost = 2, httpPut = 3, httpDelete = 4, httpPatch = 5, httpNa = -1};
+   enum ParseError {invalidRequest = -1, success = 0};
    // Initialize all the fields to NULL
-   Http_Request()
+   HttpRequest()
       {
-      this->_type = Http_Request::NA;
+      this->_type = HttpRequest::httpNa;
       this->_metric[0] = '\0';
       this->_connection[0] = '\0';
       }
    // Take a string literal as the http request and get the desired fields
-   int Parse(char* req)
+   int parse(char* req)
       {
-      long unsigned int num_chars = strcspn(req, "\r");
+      long unsigned int numChars = strcspn(req, "\r");
       char* starter = req;
-      char* last_line = strstr(req, "\r\n\r\n");
-      if (last_line == NULL)
+      char* lastLine = strstr(req, "\r\n\r\n");
+      if (lastLine == NULL)
          {
          std::cout << "Error: Received a malformed request!" << std::endl;
-         return Http_Request::Invalid_Request;
+         return HttpRequest::invalidRequest;
          }
-      char first_header[64];
+      char firstHeader[64];
       char* saveptr;
       char type[16];
-      memset((void*)first_header, 0, sizeof(first_header));
+      memset((void*)firstHeader, 0, sizeof(firstHeader));
       memset((void*)type, 0, sizeof(type));
-      strncpy(first_header, req, std::min(num_chars, sizeof(first_header)-1));
-      char* arg = strtok_r((char *)first_header, " ", (char **)&saveptr);
+      strncpy(firstHeader, req, std::min(numChars, sizeof(firstHeader)-1));
+      char* arg = strtok_r((char *)firstHeader, " ", (char **)&saveptr);
       int i = 0;
       while ((arg != NULL) && (i < 3))
          {
          if (i == 0)
             {
             if ((strlen(arg) == strlen("GET")) && (strcmp(arg, "GET") == 0))
-               this->_type = Http_Request::GET;
+               this->_type = HttpRequest::httpGet;
             else if ((strlen(arg) == strlen("HEAD")) && (strcmp(arg, "HEAD") == 0))
-               this->_type = Http_Request::HEAD;
+               this->_type = HttpRequest::httpHead;
             else if ((strlen(arg) == strlen("POST")) && (strcmp(arg, "POST") == 0))
-               this->_type = Http_Request::POST;
+               this->_type = HttpRequest::httpPost;
             else if ((strlen(arg) == strlen("PUT")) && (strcmp(arg, "PUT") == 0))
-               this->_type = Http_Request::PUT;
+               this->_type = HttpRequest::httpPut;
             else if ((strlen(arg) == strlen("DELETE")) && (strcmp(arg, "DELETE") == 0))
-               this->_type = Http_Request::DELETE;
+               this->_type = HttpRequest::httpDelete;
             else if ((strlen(arg) == strlen("PATCH")) && (strcmp(arg, "PATCH") == 0))
-               this->_type = Http_Request::PATCH;
+               this->_type = HttpRequest::httpPatch;
             else
-               this->_type = Http_Request::NA;
+               this->_type = HttpRequest::httpNa;
             }
          else if (i == 1)
             {
@@ -69,25 +91,25 @@ public:
          i++;
          }
 
-      starter += (num_chars + 2);
+      starter += (numChars + 2);
 
-      while (starter < (last_line+2))
+      while (starter < (lastLine+2))
          {
-         num_chars = strcspn(starter, "\r");
-         long unsigned int num_field_chars = strcspn(starter, ":");
+         numChars = strcspn(starter, "\r");
+         long unsigned int numFieldChars = strcspn(starter, ":");
          char field[16];
          memset((void*)field, 0, sizeof(field));
-         strncpy(field, starter, std::min(num_field_chars, sizeof(field)-1));
-         field[std::min(num_field_chars, sizeof(field)-1)] = '\0';
+         strncpy(field, starter, std::min(numFieldChars, sizeof(field)-1));
+         field[std::min(numFieldChars, sizeof(field)-1)] = '\0';
          if ((strlen(field) == strlen("Connection")) && (strcmp(field, "Connection") == 0))
             {
-            strncpy(this->_connection, starter+num_field_chars+2, std::min(num_chars-num_field_chars-2, sizeof(this->_connection)-1));
+            strncpy(this->_connection, starter+numFieldChars+2, std::min(numChars-numFieldChars-2, sizeof(this->_connection)-1));
             this->_connection[std::min(strlen(field), sizeof(this->_connection)-1)] = '\0';
             break;
             }
-         starter += (num_chars + 2);
+         starter += (numChars + 2);
          }
-      return Http_Request::Success;
+      return HttpRequest::success;
       }
    // These functions are used to access the stored fields
    int getType() const

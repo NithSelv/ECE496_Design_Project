@@ -1,3 +1,25 @@
+/*******************************************************************************
+ * Copyright (c) 2000, 2022 IBM Corp. and others
+ *
+ * This program and the accompanying materials are made available under
+ * the terms of the Eclipse Public License 2.0 which accompanies this
+ * distribution and is available at https://www.eclipse.org/legal/epl-2.0/
+ * or the Apache License, Version 2.0 which accompanies this distribution and
+ * is available at https://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * This Source Code may also be made available under the following
+ * Secondary Licenses when the conditions for such availability set
+ * forth in the Eclipse Public License, v. 2.0 are satisfied: GNU
+ * General Public License, version 2 with the GNU Classpath
+ * Exception [1] and GNU General Public License, version 2 with the
+ * OpenJDK Assembly Exception [2].
+ *
+ * [1] https://www.gnu.org/software/classpath/license.html
+ * [2] http://openjdk.java.net/legal/assembly-exception.html
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
+ *******************************************************************************/
+
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -7,18 +29,18 @@
 #include <time.h>
 
 // This class is used to add/update/store metrics for use by the server
-class Metrics_Database
+class MetricsDatabase
    {
 private:
    std::map<std::string, std::string> _mdb;
    
 public:
-   void Add_Metric(const char* name, char* value)
+   void addMetric(const char* name, char* value)
       {
       this->_mdb.insert(std::make_pair(name, value));
       }
 
-   std::string Find_Metric(const char* name) // changed return type from char* (unused so far)
+   std::string findMetric(const char* name) // changed return type from char* (unused so far)
       {
       std::map<std::string, std::string>::iterator it = _mdb.find(name);
       if (it != _mdb.end())
@@ -33,7 +55,7 @@ public:
          }
       }
 
-   int Set_Metric(const char* name, char* value)
+   int setMetric(const char* name, char* value)
       {
       std::map<std::string, std::string>::iterator it = this->_mdb.find(name);
       if (it != this->_mdb.end()) // found
@@ -47,7 +69,7 @@ public:
          }
       }
 
-   std::string Prepare_All_Metrics_Body() // changed return type from char* (used in server.cpp)
+   std::string prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
       {
       std::string msg;
       for (auto it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
@@ -60,7 +82,7 @@ public:
       return msg;
       }
 
-   void Print()
+   void print()
       {
       for (auto it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
          {
@@ -68,7 +90,7 @@ public:
          }
       }
 
-   int Initialize(double start_time)
+   int initialize(double startTime)
       {
       struct rusage stats;
       struct timeval now;
@@ -78,18 +100,18 @@ public:
       int ret = getrusage(RUSAGE_SELF, &stats);
       if (ret == 0)
          {
-         double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-         sprintf(data, "%f", cpu_time);
-         this->Add_Metric("cpu_time_sec", data);
+         double cpuTime = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
+         sprintf(data, "%f", cpuTime);
+         this->addMetric("cpuTime", data);
          memset((void*)data, 0, sizeof(data));
-         double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-         sprintf(data, "%f", calendar_time);
-         this->Add_Metric("calendar_time", data);
+         double calendarTime = now.tv_sec + 0.000001 * now.tv_usec - startTime;
+         sprintf(data, "%f", calendarTime);
+         this->addMetric("calendarTime", data);
          }
       return ret;
       }
 
-   int Update(double start_time)
+   int update(double startTime)
       {
       struct rusage stats;
       struct timeval now;
@@ -99,13 +121,13 @@ public:
       int ret = getrusage(RUSAGE_SELF, &stats);
       if (ret == 0)
          {
-         double cpu_time = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-         sprintf(data, "%f", cpu_time);
-         this->Set_Metric("cpu_time_sec", data);
+         double cpuTime = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
+         sprintf(data, "%f", cpuTime);
+         this->setMetric("cpuTime", data);
          memset((void*)data, 0, sizeof(data));
-         double calendar_time = now.tv_sec + 0.000001 * now.tv_usec - start_time;
-         sprintf(data, "%f", calendar_time);
-         this->Set_Metric("calendar_time", data);
+         double calendarTime = now.tv_sec + 0.000001 * now.tv_usec - startTime;
+         sprintf(data, "%f", calendarTime);
+         this->setMetric("calendarTime", data);
          }
       return ret;
       }

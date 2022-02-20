@@ -1,3 +1,25 @@
+/*******************************************************************************
+ * Copyright (c) 2000, 2022 IBM Corp. and others
+ *
+ * This program and the accompanying materials are made available under
+ * the terms of the Eclipse Public License 2.0 which accompanies this
+ * distribution and is available at https://www.eclipse.org/legal/epl-2.0/
+ * or the Apache License, Version 2.0 which accompanies this distribution and
+ * is available at https://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * This Source Code may also be made available under the following
+ * Secondary Licenses when the conditions for such availability set
+ * forth in the Eclipse Public License, v. 2.0 are satisfied: GNU
+ * General Public License, version 2 with the GNU Classpath
+ * Exception [1] and GNU General Public License, version 2 with the
+ * OpenJDK Assembly Exception [2].
+ *
+ * [1] https://www.gnu.org/software/classpath/license.html
+ * [2] http://openjdk.java.net/legal/assembly-exception.html
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
+ *******************************************************************************/
+
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -17,32 +39,32 @@
 #include "server.h"
 
 // These constants represent the various return codes that our main function can return.
-enum Codes {Success = 0, TooFewArgs = -1, TooManyArgs = -2, DatabaseFailed = -3, ServerFailed = -4};
+enum Codes {success = 0, tooFewArgs = -1, tooManyArgs = -2, databaseFailed = -3, serverFailed = -4};
 
-std::vector<char> http_error_check(Http_Request* req, Metrics_Database* db)
+std::vector<char> httpErrorCheck(HttpRequest* req, MetricsDatabase* db)
    {
-   Http_Response rep;
+   HttpResponse rep;
    int type = req->getType();
    std::string metric(req->getMetric());
 
-   if (type != Http_Request::GET)
+   if (type != HttpRequest::httpGet)
       {
-      rep.Add_Header_Field("", "HTTP/1.1 400 Bad Request");
-      rep.Add_Body("");
-      return rep.Prepare_Http_Response();
+      rep.addHeaderField("", "HTTP/1.1 400 Bad Request");
+      rep.addBody("");
+      return rep.prepareHttpResponse();
       }
 
    if (metric.find("/metrics\0") == std::string::npos)
       {
-      rep.Add_Header_Field("", "HTTP/1.1 404 Not Found");
-      rep.Add_Body("");
-      return rep.Prepare_Http_Response();
+      rep.addHeaderField("", "HTTP/1.1 404 Not Found");
+      rep.addBody("");
+      return rep.prepareHttpResponse();
       }
 
-   rep.Add_Header_Field("", "HTTP/1.1 200 OK");
-   rep.Add_Header_Field("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-   rep.Add_Body(db->Prepare_All_Metrics_Body());
-   return rep.Prepare_Http_Response();
+   rep.addHeaderField("", "HTTP/1.1 200 OK");
+   rep.addHeaderField("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+   rep.addBody(db->prepareAllMetricsBody());
+   return rep.prepareHttpResponse();
    }
 
 // This is the main function that runs the server code, it takes in 3 arguments
@@ -55,12 +77,12 @@ int main(int argc, char* argv[])
    if (argc < 4)
       {
       std::cout << "FAILED: Not enough arguments" << std::endl;
-      return TooFewArgs;
+      return tooFewArgs;
       }
    else if (argc > 4)
       {
       std::cout << "FAILED: Too many arguments" << std::endl;
-      return TooManyArgs;
+      return tooManyArgs;
       }
 
    // TO BE REMOVED: This is just an object used to compute the calendar time metric
@@ -68,77 +90,77 @@ int main(int argc, char* argv[])
    struct timeval start;
    gettimeofday(&start, NULL);
    // Create the database dynamically, we will be storing/adding/reading/deleting metrics from this object.
-   Metrics_Database* db = new Metrics_Database();
+   MetricsDatabase* db = new MetricsDatabase();
 
    // Initialize the database with the initial metrics
    // (supposed to take in no arguments but will be fixed once integrated with JITServer)
-   if (db->Initialize(start.tv_sec + start.tv_usec * 0.000001) != 0)
+   if (db->initialize(start.tv_sec + start.tv_usec * 0.000001) != 0)
       {
       std::cout << "FAILED: Unable to initialize database!" << std::endl;
       delete db;
-      return DatabaseFailed;
+      return databaseFailed;
       }
 
    // Assign the arguments to the appropiate variables, we will use them later
    int port = atoi(argv[1]);
-   int num_connections = atoi(argv[2]);
+   int numConnections = atoi(argv[2]);
    int timeout = atoi(argv[3]);
 
    // Start the server
-   Server server = Server(port, num_connections);
-   if (server.Start() < 0)
+   Server server = Server(port, numConnections);
+   if (server.serverStart() < 0)
       {
       std::cout << "Server failed to start!" << std::endl;
       delete db;
-      return ServerFailed;
+      return serverFailed;
       }
 
    // Handle each connection by the following
    while (1)
       {
       // Update the database
-      if (db->Update(start.tv_sec + start.tv_usec * 0.000001) < 0)
+      if (db->update(start.tv_sec + start.tv_usec * 0.000001) < 0)
          std::cout << "FAILED: database did not update!" << std::endl;
 
       // This object is used for server-client communications
       Client client;
       // This object is used for handling the parsing of the HTTP Request
-      Http_Request req;
+      HttpRequest req;
 
       // Accept a new connection
-      if (client.Accept(server.getSockfd()) < 0)
+      if (client.clientAccept(server.serverGetSockfd()) < 0)
          continue;
 
-      int keep_alive = 1;
-      while (keep_alive > 0)
+      int keepAlive = 1;
+      while (keepAlive > 0)
          {
          // Receive the msg from the client/Prometheus
-         if (client.Receive(timeout) < 0)
+         if (client.clientReceive(timeout) < 0)
             {
-            keep_alive = -1;
+            keepAlive = -1;
             break;
             }
          // Parse the std::string into the http request object
-         if (req.Parse(client.getRecvMsg()) < 0)
+         if (req.parse(client.clientGetRecvMsg()) < 0)
             {
-            keep_alive = 0;
+            keepAlive = 0;
             break;
             }
-         keep_alive = 0;
+         keepAlive = 0;
          // Check if we need to keep this connection alive for another request
          if ((strlen(req.getConnection()) == strlen("keep-alive")) && (strcmp(req.getConnection(), "keep-alive") == 0))
-            keep_alive = 1;
+            keepAlive = 1;
 
          // Verify that the http request is valid and then
          // send back the response
-         if (client.Send(http_error_check(&req, db), timeout) < 0)
+         if (client.clientSend(httpErrorCheck(&req, db), timeout) < 0)
             {
-            keep_alive = -1;
+            keepAlive = -1;
             break;
             }
          }
       // Close the client connection
-      if (keep_alive == 0)
-         client.Close();
+      if (keepAlive == 0)
+         client.clientClose();
       }
 }
