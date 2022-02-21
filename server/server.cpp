@@ -134,11 +134,12 @@ int main(int argc, char* argv[])
          HttpRequest req;
 
          // Update the database
-         if (db->update(start.tv_sec + start.tv_usec * 0.000001) < 0)
+         int check = db->update(start.tv_sec + start.tv_usec * 0.000001);
+         if (check < 0)
             std::cout << "FAILED: database did not update!" << std::endl;
 
          // Receive the msg from the client/Prometheus
-         int check = client.clientReceive(timeout);
+         check = client.clientReceive(timeout);
          if (check < 0)
             {
             keepAlive = -1;
