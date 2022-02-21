@@ -42,11 +42,11 @@
 // These constants represent the various return codes that our main function can return.
 enum Codes {success = 0, tooFewArgs = -1, tooManyArgs = -2, databaseFailed = -3, serverFailed = -4};
 
-std::vector<char> httpErrorCheck(HttpRequest* req, MetricsDatabase* db)
+std::vector<char> httpErrorCheck(HttpRequest req, MetricsDatabase* db)
    {
    HttpResponse rep;
-   int type = req->getType();
-   std::string metric(req->getMetric());
+   int type = req.getType();
+   std::string metric(req.getMetric());
 
    if (type != HttpRequest::httpGet)
       {
@@ -124,7 +124,9 @@ int main(int argc, char* argv[])
       Client client;
 
       // Accept a new connection
-      if (client.clientAccept(server.serverGetSockfd()) < 0)
+      int sockfd = server.serverGetSockfd();
+      int accept = client.clientAccept(sockfd);
+      if (accept < 0)
          continue;
 
       int keepAlive = 1;
@@ -158,7 +160,7 @@ int main(int argc, char* argv[])
          if (strcmp(connection, "keep-alive") == 0)
             keepAlive = 1;
 
-         std::vector<char> send_buffer = httpErrorCheck(&req, db);
+         std::vector<char> send_buffer = httpErrorCheck(req, db);
 
          // Verify that the http request is valid and then
          // send back the response
