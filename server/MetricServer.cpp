@@ -50,140 +50,11 @@ TR_MetricServer::TR_MetricServer()
 }
 
 // This function is where we need to run the server
-void TR_MetricServer::handleMetricRequests() {
-   TR_MetricServerHandler::Start(jitConfig);
+void TR_MetricServer::handleMetricRequests(J9JavaVm* javaVm) {
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Running JITServer Metrics Server");
+   TR_MetricServerHandler::Start(javaVm);
 }
-   TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
-   SSL_CTX *sslCtx = NULL;
-   if (JITServer::CommunicationStream::useSSL())
-      {
-      JITServer::CommunicationStream::initSSL();
-      sslCtx = createSSLContext(info);
-      }
-
-   uint32_t port = info->getJITServerPort();
-   uint32_t timeoutMs = info->getSocketTimeout();
-   struct pollfd pfd = {0};
-   int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-   if (sockfd < 0)
-      {
-      perror("can't open server socket");
-      exit(1);
-      }
-
-   // see `man 7 socket` for option explanations
-   int flag = true;
-   if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&flag, sizeof(flag)) < 0)
-      {
-      perror("Can't set SO_REUSEADDR");
-      exit(1);
-      }
-   if (setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (void *)&flag, sizeof(flag)) < 0)
-      {
-      perror("Can't set SO_KEEPALIVE");
-      exit(1);
-      }
-
-   struct sockaddr_in serv_addr;
-   memset((char *)&serv_addr, 0, sizeof(serv_addr));
-   serv_addr.sin_family = AF_INET;
-   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-   serv_addr.sin_port = htons(port);
-
-   if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-      {
-      perror("can't bind server address");
-      exit(1);
-      }
-   if (listen(sockfd, SOMAXCONN) < 0)
-      {
-      perror("listen failed");
-      exit(1);
-      }
-
-   pfd.fd = sockfd;
-   pfd.events = POLLIN;
-
-   while (!getMetricServerExitFlag())
-      {
-      int32_t rc = 0;
-      struct sockaddr_in cli_addr;
-      socklen_t clilen = sizeof(cli_addr);
-      int connfd = -1;
-
-      rc = poll(&pfd, 1, OPENJ9_LISTENER_POLL_TIMEOUT);
-      if (getListenerThreadExitFlag()) // if we are exiting, no need to check poll() status
-         {
-         break;
-         }
-      else if (0 == rc) // poll() timed out and no fd is ready
-         {
-         continue;
-         }
-      else if (rc < 0)
-         {
-         if (errno == EINTR)
-            {
-            continue;
-            }
-         else
-            {
-            perror("error in polling listening socket");
-            exit(1);
-            }
-         }
-      else if (pfd.revents != POLLIN)
-         {
-         fprintf(stderr, "Unexpected event occurred during poll for new connection: revents=%d\n", pfd.revents);
-         exit(1);
-         }
-      do
-         {
-         /* at this stage we should have a valid request for new connection */
-         connfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-         if (connfd < 0)
-            {
-            if ((EAGAIN != errno) && (EWOULDBLOCK != errno))
-               {
-               if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-                  {
-                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Error accepting connection: errno=%d", errno);
-                  }
-               }
-            }
-         else
-            {
-            struct timeval timeoutMsForConnection = {(timeoutMs / 1000), ((timeoutMs % 1000) * 1000)};
-            if (setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeoutMsForConnection, sizeof(timeoutMsForConnection)) < 0)
-               {
-               perror("Can't set option SO_RCVTIMEO on connfd socket");
-               exit(1);
-               }
-            if (setsockopt(connfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&timeoutMsForConnection, sizeof(timeoutMsForConnection)) < 0)
-               {
-               perror("Can't set option SO_SNDTIMEO on connfd socket");
-               exit(1);
-               }
-
-            BIO *bio = NULL;
-            if (sslCtx && !acceptOpenSSLConnection(sslCtx, connfd, bio))
-               continue;
-
-            JITServer::ServerStream *stream = new (TR::Compiler->persistentGlobalAllocator()) JITServer::ServerStream(connfd, bio);
-            compiler->compile(stream);
-            }
-         } while ((-1 != connfd) && !getListenerThreadExitFlag());
-      }
-
-   // The following piece of code will be executed only if the server shuts down properly
-   close(sockfd);
-   if (sslCtx)
-      {
-      (*OSSL_CTX_free)(sslCtx);
-      (*OEVP_cleanup)();
-      }
-}
-
 
 TR_MetricsServer * TR_MetricServer::allocate() {
    TR_MetricServer * listener = new (PERSISTENT_NEW) TR_MetricServer();
@@ -214,7 +85,7 @@ static int32_t J9THREAD_PROC metricServerProc(void * entryarg)
 
    j9thread_set_name(j9thread_self(), "JITServer Metric Server");
 
-   listener->handleMetricRequests();
+   listener->handleMetricRequests(vm);
 
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Detaching JITServer Metrics Server");

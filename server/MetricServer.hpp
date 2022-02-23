@@ -32,7 +32,7 @@
 //2. Run the metric server thread with start(javaVM);
 //3. Stop it with the stop() function
 
-#define OPENJ9_METRIC_SERVER_POLL_TIMEOUT 100 // in milliseconds
+//NOTE: The code here is only meant to be used to run the server thread and kill it if needed, the actual implementation of the server is in the MetricServerHandler.hpp
 
 class TR_MetricServer {
 
@@ -44,41 +44,26 @@ class TR_MetricServer {
       volatile bool _metricServerExitFlag;
 
    public:
-      TR_Listener();
+      TR_MetricServer();
       static TR_MetricServer* allocate();
-      void start(J9JavaVM *javaVM);
+      void start(J9JavaVm *javaVM);
       void stop();
-   /**
-      @brief Function called to deal with incoming connection requests
 
-      This function opens a socket (non-blocking), binds it and then waits for incoming
-      connection by polling on it with a timeout (see OPENJ9_LISTENER_POLL_TIMEOUT).
-      If it ever comes out of polling (due to timeout or a new connection request),
-      it checks the exit flag. If the flag is set, then the thread exits.
-      Otherwise, it establishes the connection using accept().
-      Once a connection is accepted a ServerStream object is created (receiving the newly
-      opened socket descriptor as a parameter) and passed to the compilation handler.
-      Typically, the compilation handler places the ServerStream object in a queue and
-      returns immediately so that other connection requests can be accepted.
-      Note: it must be executed on a separate thread as it needs to keep listening for new connections.
+      void handleMetricRequests();
+      int32_t waitForMetricServerExit(J9JavaVM *javaVM);
 
-      @param [in] compiler Object that defines the behavior when a new connection is accepted
-   */
-   void handleMetricRequests();
-   int32_t waitForMetricServerExit(J9JavaVM *javaVM);
-
-   void setAttachAttempted(bool b) { _metricServerAttachAttempted = b; }
-   bool getAttachAttempted() const { return _metricServerAttachAttempted; }
+      void setAttachAttempted(bool b) { _metricServerAttachAttempted = b; }
+      bool getAttachAttempted() const { return _metricServerAttachAttempted; }
 
 
-   J9VMThread* getMetricServer() const { return _metricServer; }
-   void setmetricServer(J9VMThread* thread) { _metricServer = thread; }
+      J9VMThread* getMetricServer() const { return _metricServer; }
+      void setmetricServer(J9VMThread* thread) { _metricServer = thread; }
 
-   j9thread_t getMetricServerOSThread() const { return _metricServerOSThread; }
-   TR::Monitor* getMetricServerMonitor() const { return _metricServerMonitor; }
+      j9thread_t getMetricServerOSThread() const { return _metricServerOSThread; }
+      TR::Monitor* getMetricServerMonitor() const { return _metricServerMonitor; }
 
-   bool getMetricServerExitFlag() const { return _metricServerExitFlag; }
-   void setMetricServerExitFlag() { _metricServerExitFlag = true; }
+      bool getMetricServerExitFlag() const { return _metricServerExitFlag; }
+      void setMetricServerExitFlag() { _metricServerExitFlag = true; }
 };
 
 #endif

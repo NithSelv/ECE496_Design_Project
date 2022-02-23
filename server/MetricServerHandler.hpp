@@ -27,5 +27,5 @@
 
 class TR_MetricServerHandler {
    public:
-      static void Start(J9JITConfig* jitConfig);
+      static void Start(J9JavaVm *javaVm);
 }
