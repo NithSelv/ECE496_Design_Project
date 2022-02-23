@@ -39,138 +39,11 @@
 #include "env/VMJ9.h"
 #include "env/VerboseLog.hpp"
 #include "net/CommunicationStream.hpp"
-#include "net/LoadSSLLibs.hpp"
+//#include "net/LoadSSLLibs.hpp"
 #include "net/ServerStream.hpp"
 #include "runtime/CompileService.hpp"
-#include "runtime/Listener.hpp"
-
-
-// These functions should be moved into our server
-static SSL_CTX * createSSLContext(TR::PersistentInfo *info) {
-   SSL_CTX *ctx = (*OSSL_CTX_new)((*OSSLv23_server_method)());
-
-   if (!ctx)
-      {
-      perror("can't create SSL context");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-
-   const char *sessionIDContext = "JITServer";
-   (*OSSL_CTX_set_session_id_context)(ctx, (const unsigned char*)sessionIDContext, strlen(sessionIDContext));
-
-   if ((*OSSL_CTX_set_ecdh_auto)(ctx, 1) != 1)
-      {
-      perror("failed to configure SSL ecdh");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-
-   TR::CompilationInfo *compInfo = TR::CompilationInfo::get();
-   auto &sslKeys = compInfo->getJITServerSslKeys();
-   auto &sslCerts = compInfo->getJITServerSslCerts();
-   auto &sslRootCerts = compInfo->getJITServerSslRootCerts();
-
-   TR_ASSERT_FATAL(sslKeys.size() == 1 && sslCerts.size() == 1, "only one key and cert is supported for now");
-   TR_ASSERT_FATAL(sslRootCerts.size() == 0, "server does not understand root certs yet");
-
-   // Parse and set private key
-   BIO *keyMem = (*OBIO_new_mem_buf)(&sslKeys[0][0], sslKeys[0].size());
-   if (!keyMem)
-      {
-      perror("cannot create memory buffer for private key (OOM?)");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-   EVP_PKEY *privKey = (*OPEM_read_bio_PrivateKey)(keyMem, NULL, NULL, NULL);
-   if (!privKey)
-      {
-      perror("cannot parse private key");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-   if ((*OSSL_CTX_use_PrivateKey)(ctx, privKey) != 1)
-      {
-      perror("cannot use private key");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-
-   // Parse and set certificate
-   BIO *certMem = (*OBIO_new_mem_buf)(&sslCerts[0][0], sslCerts[0].size());
-   if (!certMem)
-      {
-      perror("cannot create memory buffer for cert (OOM?)");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-   X509 *certificate = (*OPEM_read_bio_X509)(certMem, NULL, NULL, NULL);
-   if (!certificate)
-      {
-      perror("cannot parse cert");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-   if ((*OSSL_CTX_use_certificate)(ctx, certificate) != 1)
-      {
-      perror("cannot use cert");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-
-   // Verify key and cert are valid
-   if ((*OSSL_CTX_check_private_key)(ctx) != 1)
-      {
-      perror("private key check failed");
-      (*OERR_print_errors_fp)(stderr);
-      exit(1);
-      }
-
-   // verify server identity using standard method
-   (*OSSL_CTX_set_verify)(ctx, SSL_VERIFY_PEER, NULL);
-
-   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Successfully initialized SSL context (%s)\n", (*OOpenSSL_version)(0));
-
-   return ctx;
-}
-
-// These functions should be moved into our server
-static bool handleOpenSSLConnectionError(int connfd, SSL *&ssl, BIO *&bio, const char *errMsg) {
-   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "%s: errno=%d", errMsg, errno);
-   (*OERR_print_errors_fp)(stderr);
-
-   close(connfd);
-   if (bio)
-      {
-      (*OBIO_free_all)(bio);
-      bio = NULL;
-      }
-   return false;
-}
-
-// These functions should be moved into our server
-static bool acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio) {
-   SSL *ssl = NULL;
-   bio = (*OBIO_new_ssl)(sslCtx, false);
-   if (!bio)
-      return handleOpenSSLConnectionError(connfd, ssl, bio, "Error creating new BIO");
-
-   if ((*OBIO_ctrl)(bio, BIO_C_GET_SSL, false, (char *) &ssl) != 1) // BIO_get_ssl(bio, &ssl)
-      return handleOpenSSLConnectionError(connfd, ssl, bio, "Failed to get BIO SSL");
-
-   if ((*OSSL_set_fd)(ssl, connfd) != 1)
-      return handleOpenSSLConnectionError(connfd, ssl, bio, "Error setting SSL file descriptor");
-
-   if ((*OSSL_accept)(ssl) <= 0)
-      return handleOpenSSLConnectionError(connfd, ssl, bio, "Error accepting SSL connection");
-
-   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "SSL connection on socket 0x%x, Version: %s, Cipher: %s\n",
-                                                     connfd, (*OSSL_get_version)(ssl), (*OSSL_get_cipher)(ssl));
-   return true;
-}
+#include "runtime/MetricServer.hpp"
+#include "runtime/MetricServerHandler.hpp"
 
 TR_MetricServer::TR_MetricServer()
    : _metricServer(NULL), _metricServerMonitor(NULL), _metricServerOSThread(NULL), _metricServerAttachAttempted(false), _metricServerExitFlag(false) {
@@ -178,6 +51,8 @@ TR_MetricServer::TR_MetricServer()
 
 // This function is where we need to run the server
 void TR_MetricServer::handleMetricRequests() {
+   TR_MetricServerHandler::Start(jitConfig);
+}
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
    if (JITServer::CommunicationStream::useSSL())
@@ -229,7 +104,7 @@ void TR_MetricServer::handleMetricRequests() {
    pfd.fd = sockfd;
    pfd.events = POLLIN;
 
-   while (!getListenerThreadExitFlag())
+   while (!getMetricServerExitFlag())
       {
       int32_t rc = 0;
       struct sockaddr_in cli_addr;
@@ -307,7 +182,8 @@ void TR_MetricServer::handleMetricRequests() {
       (*OSSL_CTX_free)(sslCtx);
       (*OEVP_cleanup)();
       }
-   }
+}
+
 
 TR_MetricsServer * TR_MetricServer::allocate() {
    TR_MetricServer * listener = new (PERSISTENT_NEW) TR_MetricServer();
