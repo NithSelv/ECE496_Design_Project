@@ -25,7 +25,13 @@
 
 //Implementation of a function that is responsible for running the metric server and handling connections between clients and the metric server
 
+#define JITSERVER_METRIC_SERVER_PORT 7380
+#define JITSERVER_METRIC_SERVER_TIMEOUT_SEC 0
+#define JITSERVER_METRIC_SERVER_TIMEOUT_USEC 100000
+
 class TR_MetricServerHandler {
    public:
-      static void Start(J9JavaVm *javaVm);
+      static void Start(J9JITConfig *jitConfig);
 }
+
+#endif

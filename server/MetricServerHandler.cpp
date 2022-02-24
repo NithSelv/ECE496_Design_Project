@@ -180,6 +180,7 @@ static bool acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio) {
 }
 
 static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
+   // Make sure that this thread is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
    if (JITServer::CommunicationStream::useSSL())
@@ -188,45 +189,26 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
       sslCtx = createSSLContext(info);
       }
 
-   uint32_t port = info->getJITServerPort();
-   uint32_t timeoutMs = info->getSocketTimeout();
+   // We will use this object to store our metrics for reading and writing
+   MetricsDatabase db;
+   // Initialize the database with the initial metrics extracted from jitConfig
+   if (db.initialize(jitConfig) != 0)
+      {
+      perror("Metric Server: Unable to initialize metric server database");
+      exit(1);
+      }
+
+   // This server object will handle the listening of connections
+   Server server = Server(JITSERVER_METRIC_SERVER_PORT);
+
+   // Start the server
+   if (server.serverStart() < 0)
+      {
+      perror("Metric Server: Metric server failed to start!");
+      exit(1);
+      }
+   
    struct pollfd pfd = {0};
-   int sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-   if (sockfd < 0)
-      {
-      perror("can't open server socket");
-      exit(1);
-      }
-
-   // see `man 7 socket` for option explanations
-   int flag = true;
-   if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&flag, sizeof(flag)) < 0)
-      {
-      perror("Can't set SO_REUSEADDR");
-      exit(1);
-      }
-   if (setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (void *)&flag, sizeof(flag)) < 0)
-      {
-      perror("Can't set SO_KEEPALIVE");
-      exit(1);
-      }
-
-   struct sockaddr_in serv_addr;
-   memset((char *)&serv_addr, 0, sizeof(serv_addr));
-   serv_addr.sin_family = AF_INET;
-   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-   serv_addr.sin_port = htons(port);
-
-   if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-      {
-      perror("can't bind server address");
-      exit(1);
-      }
-   if (listen(sockfd, SOMAXCONN) < 0)
-      {
-      perror("listen failed");
-      exit(1);
-      }
 
    pfd.fd = sockfd;
    pfd.events = POLLIN;
@@ -280,46 +262,27 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
             }
          else
             {
-            struct timeval timeoutMsForConnection = {(timeoutMs / 1000), ((timeoutMs % 1000) * 1000)};
-            if (setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeoutMsForConnection, sizeof(timeoutMsForConnection)) < 0)
-               {
-               perror("Can't set option SO_RCVTIMEO on connfd socket");
-               exit(1);
-               }
-            if (setsockopt(connfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&timeoutMsForConnection, sizeof(timeoutMsForConnection)) < 0)
-               {
-               perror("Can't set option SO_SNDTIMEO on connfd socket");
-               exit(1);
-               }
+
+            // They put the options for setting timeout here but we do it when we create our client object
 
             BIO *bio = NULL;
             if (sslCtx && !acceptOpenSSLConnection(sslCtx, connfd, bio))
                continue;
 
-            JITServer::ServerStream *stream = new (TR::Compiler->persistentGlobalAllocator()) JITServer::ServerStream(connfd, bio);
-            compiler->compile(stream);
+            // Here is where we receive the message and send the info
+            //
             }
          } while ((-1 != connfd) && !getListenerThreadExitFlag());
       }
 
-   // The following piece of code will be executed only if the server shuts down properly
-   close(sockfd);
+   // Close down the server if shut down properly
+   server.serverClose();
    if (sslCtx)
       {
       (*OSSL_CTX_free)(sslCtx);
       (*OEVP_cleanup)();
       }
 }
-
-
-
-}
-
-
-
-
-// These constants represent the various return codes that our main function can return.
-enum Codes {success = 0, tooFewArgs = -1, tooManyArgs = -2, databaseFailed = -3, serverFailed = -4};
 
 std::vector<char> httpErrorCheck(HttpRequest req, MetricsDatabase* db)
    {
@@ -353,47 +316,6 @@ std::vector<char> httpErrorCheck(HttpRequest req, MetricsDatabase* db)
 // 3: how long the server should wait for a connection's request before timing out (sec)
 int main(int argc, char* argv[])
    {
-   // First check to make sure that we have all 3 required arguments
-   if (argc < 4)
-      {
-      std::cout << "FAILED: Not enough arguments" << std::endl;
-      return tooFewArgs;
-      }
-   else if (argc > 4)
-      {
-      std::cout << "FAILED: Too many arguments" << std::endl;
-      return tooManyArgs;
-      }
-
-   // TO BE REMOVED: This is just an object used to compute the calendar time metric
-   // Once we can retrieve metrics from JITServer, we will remove this
-   struct timeval start;
-   gettimeofday(&start, NULL);
-   // Create the database dynamically, we will be storing/adding/reading/deleting metrics from this object.
-   MetricsDatabase* db = new MetricsDatabase();
-
-   // Initialize the database with the initial metrics
-   // (supposed to take in no arguments but will be fixed once integrated with JITServer)
-   if (db->initialize(start.tv_sec + start.tv_usec * 0.000001) != 0)
-      {
-      std::cout << "FAILED: Unable to initialize database!" << std::endl;
-      delete db;
-      return databaseFailed;
-      }
-
-   // Assign the arguments to the appropiate variables, we will use them later
-   int port = atoi(argv[1]);
-   int numConnections = atoi(argv[2]);
-   int timeout = atoi(argv[3]);
-
-   // Start the server
-   Server server = Server(port, numConnections);
-   if (server.serverStart() < 0)
-      {
-      std::cout << "Server failed to start!" << std::endl;
-      delete db;
-      return serverFailed;
-      }
 
    // Handle each connection by the following
    while (1)

@@ -50,10 +50,10 @@ TR_MetricServer::TR_MetricServer()
 }
 
 // This function is where we need to run the server
-void TR_MetricServer::handleMetricRequests(J9JavaVm* javaVm) {
+void TR_MetricServer::handleMetricRequests(J9JITConfig* jitConfig) {
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Running JITServer Metrics Server");
-   TR_MetricServerHandler::Start(javaVm);
+   TR_MetricServerHandler::Start(jitConfig);
 }
 
 TR_MetricsServer * TR_MetricServer::allocate() {
@@ -85,7 +85,7 @@ static int32_t J9THREAD_PROC metricServerProc(void * entryarg)
 
    j9thread_set_name(j9thread_self(), "JITServer Metric Server");
 
-   listener->handleMetricRequests(vm);
+   listener->handleMetricRequests(jitConfig);
 
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Detaching JITServer Metrics Server");

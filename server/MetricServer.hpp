@@ -46,7 +46,7 @@ class TR_MetricServer {
    public:
       TR_MetricServer();
       static TR_MetricServer* allocate();
-      void start(J9JavaVm *javaVM);
+      void start(J9JITConfig *jitConfig);
       void stop();
 
       void handleMetricRequests();
