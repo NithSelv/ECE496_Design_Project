@@ -31,6 +31,13 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include "j9.h"
+#include "control/CompilationRuntime.hpp"
+#include "env/TRMemory.hpp"
+#include "env/VMJ9.h"
+#include "env/VerboseLog.hpp"
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
 
 // This class is used to handle the client communications
 class Client

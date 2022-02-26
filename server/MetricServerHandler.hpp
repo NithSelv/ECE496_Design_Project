@@ -29,6 +29,8 @@
 #define JITSERVER_METRIC_SERVER_TIMEOUT_USEC 100000
 #define JITSERVER_METRIC_SERVER_POLLFDS 10
 
+#include "MetricServer.hpp"
+
 class TR_MetricServerHandler {
    public:
       static void Start(J9JITConfig *jitConfig, MetricServer* m);
