@@ -36,7 +36,6 @@ class Server
 private:
    struct sockaddr_in _serverAddr;
    int _port;
-   int _numConnections;
    int _sockfd;
 
 public:
@@ -104,9 +103,18 @@ public:
       {
       return this->_sockfd;
       }
+   // Clear all the data structures and close the connection if not already closed
+   void serverClear()
+      {
+      if (this->_sockfd > 0)
+         this->serverClose();
+      this->_port = -1;
+      memset(this->_serverAddr, 0, sizeof(this->_serverAddr));
+      }
    
    void serverClose() 
       {
       close(this->_sockfd);
+      this->_sockfd = -1;
       }
    };

@@ -262,7 +262,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
                {
                   // There's some available spots, take one and use it to handle an incoming request.
                   int new_index = newfds.back();
-                  clients[new_index-1].clientAccept(server.getSockfd());
+                  clients[new_index-1].clientAccept(server.getSockfd(), sslCtx);
                   fds[new_index].fd = clients[new_index-1].getSockfd();
                   fds[new_index].events = POLLIN;
                   fds[new_index].revents = 0;
@@ -271,51 +271,23 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
          }
 
       // Prepare to handle requests from accepted connections
+      int success = 0;
       for (int i = 1; i < (JITSERVER_METRIC_SERVER_POLLFDS+1); i++) 
       {
          if (fds[i].fd > 0) 
          {
-            //Read the buffer
+            // Receive the msg from the client/Prometheus
+            success = client.clientReceive(timeout);
             //Check if HTTP Message is valid
             //Send appropiate response
             //If Keep-Alive, then don't remove socket else remove it and add it back to the queue
          }
       }
 
+   }
 
-
-      
-      do
-         {
-         /* at this stage we should have a valid request for new connection */
-         connfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-         if (connfd < 0)
-            {
-            if ((EAGAIN != errno) && (EWOULDBLOCK != errno))
-               {
-               if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-                  {
-                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Error accepting connection: errno=%d", errno);
-                  }
-               }
-            }
-         else
-            {
-
-            // They put the options for setting timeout here but we do it when we create our client object
-
-            BIO *bio = NULL;
-            if (sslCtx && !acceptOpenSSLConnection(sslCtx, connfd, bio))
-               continue;
-
-            // Here is where we receive the message and send the info
-            //
-            }
-         } while ((-1 != connfd) && !m->getMetricServerExitFlag());
-      }
-
-   // Close down the server if shut down properly
-   server.serverClose();
+   // Close down the server and clear any info
+   server.serverClear();
    if (sslCtx)
       {
       (*OSSL_CTX_free)(sslCtx);

@@ -94,7 +94,14 @@ public:
       this->_sockfd = accept(serverSock, (struct sockaddr *)&(this->_clientAddr), (socklen_t *)&(this->_clientAddrSize));
       if (this->_sockfd < 0)
          {
-            perror("Metric Server: Failed to connect to client!");
+            if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
+               {
+               perror("Metric Server: Failed to connect to client!");
+               }
+            else
+               {
+               perror("Metric Server: Connection timed out!");
+               }
             return Client::acceptFailed;
          }
       if (sslCtx != NULL) 
@@ -115,6 +122,7 @@ public:
    int clientReceive(int timeout)
       {
       int totalBytes = 0;
+      int numBytes = 0;
       this->clientSetRecvTimeout(timeout);
       memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
       if (this->_useSSL == 1)
@@ -122,48 +130,83 @@ public:
       // We aren't using SSL
       if (this->_useSSL == 0)
          {
-         int numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
-         
-         while (numBytes > 0)
-            {
-            totalBytes += numBytes;
-            if (totalBytes >= 4095)
-               {
-               numBytes = -1;
-               continue;
-               }
-            numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
-            }
-         if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
-            {
-            perror("Metric Server: Failed to receive msg!");
-            close(this->_sockfd);
-            return Client::receiveFailed;
-            }
-         if (totalBytes == 0) 
-            {
-            close(this->_sockfd);
-            return Client::receiveFailed;
-            }
-         this->_recvBuffer[totalBytes] = '\0';
-         return Client::success;
+         numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
          }
-      // We do use SSL
+      // We are using SSL
       else
          {
-
+         SSL* ssl = NULL;
+         BIO_get_ssl(this->_bio, ssl);
+         numBytes = SSL_read(ssl, this->_recvBuffer, sizeof(this->_recvBuffer)-1);
          }
+         
+      while (numBytes > 0)
+         {
+         totalBytes += numBytes;
+         if (totalBytes >= 4095)
+            {
+            numBytes = -1;
+            continue;
+            }
+         if (this->_useSSL == 0)
+            {
+            numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
+            }
+         else 
+            {
+            SSL* ssl = NULL;
+            BIO_get_ssl(this->_bio, ssl);
+            numBytes = SSL_read(ssl, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
+            }
+         }
+      if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
+         {
+         perror("Metric Server: Failed to receive msg!");
+         close(this->_sockfd);
+         return Client::receiveFailed;
+         }
+      if (totalBytes == 0) 
+         {
+         close(this->_sockfd);
+         return Client::receiveFailed;
+         }
+      this->_recvBuffer[totalBytes] = '\0';
+      return Client::success;
       }
    // Add a timeout for sending messages and send it
    int clientSend(std::vector<char> sendBuffer, int timeout)
       {
       int totalBytes = 0;
+      int numBytes = 0;
       this->clientSetSendTimeout(timeout);
-      int numBytes = send(this->_sockfd, &(sendBuffer[0]), sendBuffer.size(), 0);
+      if (this->_useSSL == 1)
+         SSL_CTX_set_mode(this->_sslCtx, SSL_MODE_AUTO_RETRY);
+      // Don't use SSL
+      if (this->_useSSL == 0)
+         {
+         numBytes = send(this->_sockfd, &(sendBuffer[0]), sendBuffer.size(), 0);
+         }
+      // Use SSL
+      else
+         {
+         SSL* ssl = NULL;
+         BIO_get_ssl(this->_bio, ssl);
+         numBytes = SSL_write(ssl, &(sendBuffer[0]), sendBuffer.size());
+         }
+
       while (numBytes > 0)
          {
          totalBytes += numBytes;
-         numBytes = send(this->_sockfd, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes, 0);
+         if (this->_useSSL == 0)
+            {
+            numBytes = send(this->_sockfd, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes, 0);
+            }
+         else 
+            {
+            SSL* ssl = NULL;
+            BIO_get_ssl(this->_bio, ssl);
+            numBytes = SSL_write(ssl, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes);
+            }
          }
       if ((numBytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK)))
          {
@@ -182,10 +225,22 @@ public:
    int clientGetSockfd() {
    return this->_sockfd;
    }
+   // Clear the client structure for reuse
+   void clientClear() {
+   if (this->_sockfd > 0)
+      this->clientClose();
+   this->_bio = NULL;
+   this->_sslCtx = NULL;
+   this->_useSSL = 0;
+   memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
+   memset(this->_clientAddr, 0, sizeof(this->_clientAddr));
+   this->_clientAddrSize = 0;
+   }
    // Remember to close the connection once finished
    // Structures go out of scope so no need for memory cleanup
    void clientClose()
       {
       close(this->_sockfd);
+      this->_sockfd = -1;
       }
    };
