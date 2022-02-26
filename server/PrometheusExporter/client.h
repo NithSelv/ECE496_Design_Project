@@ -43,10 +43,15 @@ private:
    struct timeval _sendTimer;
    socklen_t _clientAddrSize;
    char _recvBuffer[4096];
+   BIO* _bio;
+   SSL_CTX* _sslCtx;
+   int _useSSL;
 
    // This private function allows us to set the timeout for receiving messages.
-   int clientSetRecvTimeout()
+   int clientSetRecvTimeout(int timeout)
       {
+      this->_recvTimer.tv_sec = 0;
+      this->_recvTimer.tv_usec = timeout;
       if (setsockopt(this->_sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&(this->_recvTimer), sizeof(this->_recvTimer)) < 0)
          {
          perror("Metric Server: Failed to set timeout!");
@@ -57,8 +62,10 @@ private:
       }
 
    // This private function allows us to set the timeout for sending messages.
-   int clientSetSendTimeout()
+   int clientSetSendTimeout(int timeout)
       {
+      this->_sendTimer.tv_sec = 0;
+      this->_sendTimer.tv_usec = timeout;
       if (setsockopt(this->_sockfd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&(this->_sendTimer), sizeof(this->_sendTimer)) < 0)
          {
          perror("Metric Server: Failed to set timeout!");
@@ -72,62 +79,86 @@ public:
    // Some enums for error codes
    enum ReturnCodes {success = 0, acceptFailed = -1, timeoutFailed = -2, receiveFailed = -3, sendFailed = -4};
    // Set the initial sockfd to some invalid value
-   Client(int timeout_sec, int timeout_usec)
+   Client()
       {
       this->_sockfd = -1;
       this->_recvBuffer[0] = '\0';
-      this->_sendTimer.tv_sec = timeout_sec;
-      this->_sendTimer.tv_usec = timeout_usec;
-      this->_recvTimer.tv_sec = timeout_sec;
-      this->_recvTimer.tv_usec = timeout_usec;
+      this->_bio = NULL;
+      this->_useSSL = 0;
+      this->_sslCtx = NULL;
       }
    // Accept the connection and populate the client structures
-   int clientAccept(int serverSock)
+   int clientAccept(int serverSock, SSL_CTX* sslCtx)
       {
+      this->_sslCtx = sslCtx;
       this->_sockfd = accept(serverSock, (struct sockaddr *)&(this->_clientAddr), (socklen_t *)&(this->_clientAddrSize));
       if (this->_sockfd < 0)
          {
-         perror("Metric Server: Failed to connect to client!");
-         return Client::acceptFailed;
+            perror("Metric Server: Failed to connect to client!");
+            return Client::acceptFailed;
+         }
+      if (sslCtx != NULL) 
+         {
+            if (!acceptOpenSSLConnection(sslCtx, this->_sockfd, this->_bio))
+            {
+               perror("Metric Server: Failed to connect to client using SSL!");
+               return Client::acceptFailed;
+            }
+            else 
+            {
+               this->_useSSL = 1;
+            }
          }
       return Client::success;
       }
    // Add a timeout for receving messages and store the received message in the buffer
-   int clientReceive()
+   int clientReceive(int timeout)
       {
       int totalBytes = 0;
-      this->clientSetRecvTimeout();
+      this->clientSetRecvTimeout(timeout);
       memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
-      int numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
-      while (numBytes > 0)
+      if (this->_useSSL == 1)
+         SSL_CTX_set_mode(this->_sslCtx, SSL_MODE_AUTO_RETRY); 
+      // We aren't using SSL
+      if (this->_useSSL == 0)
          {
-         totalBytes += numBytes;
-         if (totalBytes >= 4095)
+         int numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
+         
+         while (numBytes > 0)
             {
-            numBytes = -1;
-            continue;
+            totalBytes += numBytes;
+            if (totalBytes >= 4095)
+               {
+               numBytes = -1;
+               continue;
+               }
+            numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
             }
-         numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
+         if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
+            {
+            perror("Metric Server: Failed to receive msg!");
+            close(this->_sockfd);
+            return Client::receiveFailed;
+            }
+         if (totalBytes == 0) 
+            {
+            close(this->_sockfd);
+            return Client::receiveFailed;
+            }
+         this->_recvBuffer[totalBytes] = '\0';
+         return Client::success;
          }
-      if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
+      // We do use SSL
+      else
          {
-         perror("Metric Server: Failed to receive msg!");
-         close(this->_sockfd);
-         return Client::receiveFailed;
+
          }
-      if (totalBytes == 0) 
-         {
-         close(this->_sockfd);
-         return Client::receiveFailed;
-         }
-      this->_recvBuffer[totalBytes] = '\0';
-      return Client::success;
       }
    // Add a timeout for sending messages and send it
-   int clientSend(std::vector<char> sendBuffer)
+   int clientSend(std::vector<char> sendBuffer, int timeout)
       {
       int totalBytes = 0;
-      this->clientSetSendTimeout();
+      this->clientSetSendTimeout(timeout);
       int numBytes = send(this->_sockfd, &(sendBuffer[0]), sendBuffer.size(), 0);
       while (numBytes > 0)
          {

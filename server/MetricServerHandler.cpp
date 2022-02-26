@@ -180,7 +180,7 @@ static bool acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio) {
 }
 
 static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* m) {
-   // Make sure that this thread is SSL encrypted
+   // Make sure that this server is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
    if (JITServer::CommunicationStream::useSSL())
@@ -191,7 +191,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
 
    // We will use this object to store our metrics for reading and writing
    MetricsDatabase db;
-   // Initialize the database with the initial metrics extracted from jitConfig
+   // Initialize the database with the metrics extracted from jitserver
    db.update(jitConfig);
 
    // This server object will handle the listening of connections
@@ -200,32 +200,39 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
    // Start the server
    if (server.serverStart() < 0)
       {
-      perror("Metric Server: Metric server failed to start!");
       exit(1);
       }
    
-   struct pollfd pfd = {0};
-
-   pfd.fd = sockfd;
-   pfd.events = POLLIN;
-
+   // Create the array of pollfds and client structures
+   struct pollfd fds[JITSERVER_METRIC_SERVER_POLLFDS+1];
+   Client clients[JITSERVER_METRIC_SERVER_POLLFDS];
+   fds[0].fd = server.getSockfd();
+   fds[0].events = POLLIN;
+   fds[0].revents = 0;
+   // Keep a queue for free spots on the pollfd array
+   std::vector<int> newfds;
+   // Initialize the other fds so that they don't trigger anything
+   for (int i = 1; i < (JITSERVER_METRIC_SERVER_POLLFDS+1); i++) 
+   {
+      fds[i].fd = -1;
+      fds[i].events = POLLIN;
+      fds[i].revents = 0;
+      newfds.push_back(i);
+   }
    while (!m->getMetricServerExitFlag())
       {
-      int32_t rc = 0;
-      struct sockaddr_in cli_addr;
-      socklen_t clilen = sizeof(cli_addr);
-      int connfd = -1;
-
-      rc = poll(&pfd, 1, OPENJ9_LISTENER_POLL_TIMEOUT);
+      int check = 0;
+      // Poll every few ms
+      check = poll(&fds, JITSERVER_METRIC_SERVER_POLLFDS+1, JITSERVER_METRIC_SERVER_TIMEOUT_USEC / 1000);
       if (m->getMetricServerExitFlag()) // if we are exiting, no need to check poll() status
          {
          break;
          }
-      else if (0 == rc) // poll() timed out and no fd is ready
+      else if (check == 0) // poll() timed out and no fd is ready
          {
          continue;
          }
-      else if (rc < 0)
+      else if (check < 0)
          {
          if (errno == EINTR)
             {
@@ -233,15 +240,51 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
             }
          else
             {
-            perror("error in polling listening socket");
+            perror("Metric Server: Error in polling listening socket!");
             exit(1);
             }
          }
-      else if (pfd.revents != POLLIN)
+      else if ((fds[0].revents != POLLIN) && (fds[0].revents != 0))
          {
-         fprintf(stderr, "Unexpected event occurred during poll for new connection: revents=%d\n", pfd.revents);
+         fprintf(stderr, "Metric Server: Unexpected event occurred during poll for new metric server connection: revents=%d\n", fds[0].revents);
          exit(1);
          }
+
+      // Prepare to accept new connections
+      if (fds[0].revents == POLLIN) 
+         {
+            // We need to wait and handle a few connections before taking anymore connections
+            if (newfds.size() == 0) 
+               {
+                  break;
+               }
+            else
+               {
+                  // There's some available spots, take one and use it to handle an incoming request.
+                  int new_index = newfds.back();
+                  clients[new_index-1].clientAccept(server.getSockfd());
+                  fds[new_index].fd = clients[new_index-1].getSockfd();
+                  fds[new_index].events = POLLIN;
+                  fds[new_index].revents = 0;
+                  newfds.pop_back();
+               }
+         }
+
+      // Prepare to handle requests from accepted connections
+      for (int i = 1; i < (JITSERVER_METRIC_SERVER_POLLFDS+1); i++) 
+      {
+         if (fds[i].fd > 0) 
+         {
+            //Read the buffer
+            //Check if HTTP Message is valid
+            //Send appropiate response
+            //If Keep-Alive, then don't remove socket else remove it and add it back to the queue
+         }
+      }
+
+
+
+      
       do
          {
          /* at this stage we should have a valid request for new connection */
