@@ -36,18 +36,16 @@ class Server
 private:
    struct sockaddr_in _serverAddr;
    int _port;
-   int _numConnections;
    int _sockfd;
 
 public:
    // These are the enums for all the return codes that our server can return
-   enum ReturnCodes {success = 0, invalidPort = -1, invalidNumConnections = -2, socketCreationFailed = -3, bindingFailed = -4, listeningFailed = -5};
+   enum ReturnCodes {success = 0, invalidPort = -1, socketCreationFailed = -2, socketOptionFailed = -3, bindingFailed = -4, listeningFailed = -5};
    // Initialize the server values except for the sockfd
    // This works for IPV4, may need to change it to adjust for IPV6
-   Server(int port, int numConnections)
+   Server(int port)
       {
       this->_port = port;
-      this->_numConnections = numConnections;
       this->_sockfd = -1;
       this->_serverAddr.sin_port = htons(port);
       this->_serverAddr.sin_family = AF_INET;
@@ -60,32 +58,41 @@ public:
       // Make sure we are listening on a valid port number
       if ((this->_port < 1024) || (this->_port > 65535))
          {
-         std::cout << "Invalid port number!" << std::endl;
+         perror("Metric Server: Invalid port number!");
          return Server::invalidPort;
          }
-      if ((this->_numConnections < 1) || (this->_numConnections > 5))
-         {
-         std::cout << "Invalid number of connections!" << std::endl;
-         return Server::invalidNumConnections;
-         }
       // Create the socket
-      this->_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+      this->_sockfd = socket(AF_INET,  SOCK_STREAM | SOCK_NONBLOCK, 0);
       if (this->_sockfd < 0)
          {
-         std::cout << "Socket Creation Failed!" << std::endl;
+         perror("Metric Server: Socket Creation Failed!");
          return Server::socketCreationFailed;
          }
+      // Set some socket options for reuse and keep alive packets
+      int flag = true;
+      if (setsockopt(this->_sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&flag, sizeof(flag)) < 0)
+         {
+         perror("Metric Server: Can't set SO_REUSEADDR!");
+         return Server::socketOptionFailed;
+         }
+
+      if (setsockopt(this->_sockfd, SOL_SOCKET, SO_KEEPALIVE, (void *)&flag, sizeof(flag)) < 0)
+         {
+         perror("Metric Server: Can't set SO_KEEPALIVE!");
+         return Server::socketOptionFailed;
+         }
+
       // Bind it to the server
       if (bind(this->_sockfd, (struct sockaddr *)&(this->_serverAddr), (socklen_t)sizeof(this->_serverAddr)) != 0)
          {
-         std::cout << "Socket Binding Failed!" << std::endl;
+         perror("Metric Server: Socket Binding Failed!");
          close(this->_sockfd);
          return Server::bindingFailed;
          }
       // Start listening
-      if (listen(this->_sockfd, this->_numConnections) < 0)
+      if (listen(this->_sockfd, SO_MAXCONN) < 0)
          {
-         std::cout << "Socket Failed to Listen!" << std::endl;
+         perror("Metric Server: Socket Failed to Listen!");
          close(this->_sockfd);
          return Server::listeningFailed;
          }
@@ -95,5 +102,19 @@ public:
    int serverGetSockfd()
       {
       return this->_sockfd;
+      }
+   // Clear all the data structures and close the connection if not already closed
+   void serverClear()
+      {
+      if (this->_sockfd > 0)
+         this->serverClose();
+      this->_port = -1;
+      memset(this->_serverAddr, 0, sizeof(this->_serverAddr));
+      }
+   
+   void serverClose() 
+      {
+      close(this->_sockfd);
+      this->_sockfd = -1;
       }
    };
