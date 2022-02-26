@@ -28,10 +28,11 @@
 #define JITSERVER_METRIC_SERVER_PORT 7380
 #define JITSERVER_METRIC_SERVER_TIMEOUT_SEC 0
 #define JITSERVER_METRIC_SERVER_TIMEOUT_USEC 100000
+#define JITSERVER_METRIC_SERVER_POLLFDS 10
 
 class TR_MetricServerHandler {
    public:
-      static void Start(J9JITConfig *jitConfig);
+      static void Start(J9JITConfig *jitConfig, MetricServer* m);
 }
 
 #endif

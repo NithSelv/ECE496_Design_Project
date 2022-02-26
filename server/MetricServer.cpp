@@ -53,7 +53,7 @@ TR_MetricServer::TR_MetricServer()
 void TR_MetricServer::handleMetricRequests(J9JITConfig* jitConfig) {
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Running JITServer Metrics Server");
-   TR_MetricServerHandler::Start(jitConfig);
+   TR_MetricServerHandler::Start(jitConfig, this);
 }
 
 TR_MetricsServer * TR_MetricServer::allocate() {

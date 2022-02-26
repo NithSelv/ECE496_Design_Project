@@ -26,6 +26,11 @@
 #include <map>
 #include <iostream>
 #include <sys/resource.h>
+#include "j9.h"
+#include "control/CompilationRuntime.hpp"
+#include "env/TRMemory.hpp"
+#include "env/VMJ9.h"
+#include "env/VerboseLog.hpp"
 
 // This class is used to add/update/store metrics for use by the server
 class MetricsDatabase

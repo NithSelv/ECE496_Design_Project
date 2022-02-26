@@ -179,7 +179,7 @@ static bool acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio) {
    return true;
 }
 
-static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
+static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* m) {
    // Make sure that this thread is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
@@ -192,11 +192,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
    // We will use this object to store our metrics for reading and writing
    MetricsDatabase db;
    // Initialize the database with the initial metrics extracted from jitConfig
-   if (db.initialize(jitConfig) != 0)
-      {
-      perror("Metric Server: Unable to initialize metric server database");
-      exit(1);
-      }
+   db.update(jitConfig);
 
    // This server object will handle the listening of connections
    Server server = Server(JITSERVER_METRIC_SERVER_PORT);
@@ -213,7 +209,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
    pfd.fd = sockfd;
    pfd.events = POLLIN;
 
-   while (!getMetricServerExitFlag())
+   while (!m->getMetricServerExitFlag())
       {
       int32_t rc = 0;
       struct sockaddr_in cli_addr;
@@ -221,7 +217,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
       int connfd = -1;
 
       rc = poll(&pfd, 1, OPENJ9_LISTENER_POLL_TIMEOUT);
-      if (getListenerThreadExitFlag()) // if we are exiting, no need to check poll() status
+      if (m->getMetricServerExitFlag()) // if we are exiting, no need to check poll() status
          {
          break;
          }
@@ -272,7 +268,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig) {
             // Here is where we receive the message and send the info
             //
             }
-         } while ((-1 != connfd) && !getListenerThreadExitFlag());
+         } while ((-1 != connfd) && !m->getMetricServerExitFlag());
       }
 
    // Close down the server if shut down properly
