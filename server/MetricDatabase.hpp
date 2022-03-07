@@ -31,6 +31,7 @@
 #include "env/TRMemory.hpp"
 #include "env/VMJ9.h"
 #include "env/VerboseLog.hpp"
+#include "control/JITServerCompilationTHread.hpp"
 
 // This class is used to add/update/store metrics for use by the server
 class MetricsDatabase
@@ -40,7 +41,7 @@ private:
    
 public:
 
-   std::string MetricsDatabase::findMetric(const char* name) // changed return type from char* (unused so far)
+   std::string findMetric(const char* name) // changed return type from char* (unused so far)
       {
       std::map<std::string, std::string>::iterator it = _mdb.find(name);
       if (it != _mdb.end())
@@ -56,7 +57,7 @@ public:
          }
       }
 
-   void MetricsDatabase::setMetric(const char* name, char* value)
+   void setMetric(const char* name, char* value)
       {
       std::map<std::string, std::string>::iterator it = this->_mdb.find(name);
       if (it != this->_mdb.end()) // found
@@ -69,7 +70,7 @@ public:
          }
       }
 
-   std::string MetricsDatabase::prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
+   std::string prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
       {
       std::string msg;
       for (std::map<std::string, std::string>::iterator it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
@@ -90,7 +91,7 @@ public:
          }
       }
 
-   void MetricsDatabase::update(J9JITConfig* jitConfig)
+   void update(J9JITConfig* jitConfig)
       {
       TR::CompilationInfo* cInfo = TR::CompilationInfo::get(jitConfig);
       CpuUtilization* cUtil = cInfo->getCpuUtil();
