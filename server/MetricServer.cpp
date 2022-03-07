@@ -56,7 +56,7 @@ void TR_MetricServer::handleMetricRequests(J9JITConfig* jitConfig) {
    TR_MetricServerHandler::Start(jitConfig, this);
 }
 
-TR_MetricsServer * TR_MetricServer::allocate() {
+TR_MetricServer * TR_MetricServer::allocate() {
    TR_MetricServer * listener = new (PERSISTENT_NEW) TR_MetricServer();
    return listener;
 }
@@ -65,7 +65,7 @@ static int32_t J9THREAD_PROC metricServerProc(void * entryarg)
    {
    J9JITConfig * jitConfig = (J9JITConfig *) entryarg;
    J9JavaVM * vm = jitConfig->javaVM;
-   TR_MetricServer *listener = ((TR_JitPrivateConfig*)(jitConfig->privateConfig))->listener;
+   TR_MetricServer *listener = ((TR_JitPrivateConfig*)(jitConfig->privateConfig))->metric_server;
    J9VMThread *listenerThread = NULL;
    PORT_ACCESS_FROM_JITCONFIG(jitConfig);
 
@@ -91,16 +91,17 @@ static int32_t J9THREAD_PROC metricServerProc(void * entryarg)
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Detaching JITServer Metrics Server");
 
    vm->internalVMFunctions->DetachCurrentThread((JavaVM *) vm);
-   listener->getMetricsServerMonitor()->enter();
-   listener->setMetricsServer(NULL);
-   listener->getMetricsServerMonitor()->notifyAll();
-   j9thread_exit((J9ThreadMonitor*)listener->getMetricsServerMonitor()->getVMMonitor());
+   listener->getMetricServerMonitor()->enter();
+   listener->setMetricServer(NULL);
+   listener->getMetricServerMonitor()->notifyAll();
+   j9thread_exit((J9ThreadMonitor*)listener->getMetricServerMonitor()->getVMMonitor());
 
    return 0;
 }
 
-void TR_MetricServer::start(J9JavaVM *javaVM) {
-   PORT_ACCESS_FROM_JAVAVM(javaVM);
+void TR_MetricServer::start(J9JITConfig *jitConfig) {
+   J9JavaVM * vm = jitConfig->javaVM;
+   PORT_ACCESS_FROM_JAVAVM(vm);
 
    UDATA priority;
    priority = J9THREAD_PRIORITY_NORMAL;
@@ -109,14 +110,14 @@ void TR_MetricServer::start(J9JavaVM *javaVM) {
    if (_metricServerMonitor)
       {
       // create the thread for listening to a metric request
-      const UDATA defaultOSStackSize = javaVM->defaultOSStackSize; //256KB stack size
+      const UDATA defaultOSStackSize = vm->defaultOSStackSize; //256KB stack size
 
-      if (J9THREAD_SUCCESS != javaVM->internalVMFunctions->createJoinableThreadWithCategory(&_metricServerOSThread,
+      if (J9THREAD_SUCCESS != vm->internalVMFunctions->createJoinableThreadWithCategory(&_metricServerOSThread,
                                                                defaultOSStackSize,
                                                                priority,
                                                                0,
                                                                &metricServerProc,
-                                                               javaVM->jitConfig,
+                                                               vm->jitConfig,
                                                                J9THREAD_CATEGORY_SYSTEM_JIT_THREAD))
          { // cannot create the metric server thread
          j9tty_printf(PORTLIB, "Error: Unable to create JITServer Metric Server.\n");

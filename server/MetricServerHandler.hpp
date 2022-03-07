@@ -33,7 +33,7 @@
 
 class TR_MetricServerHandler {
    public:
-      static void Start(J9JITConfig *jitConfig, MetricServer* m);
-}
+      void Start(J9JITConfig *jitConfig, TR_MetricServer* m);
+};
 
 #endif

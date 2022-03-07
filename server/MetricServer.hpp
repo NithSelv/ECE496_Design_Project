@@ -57,7 +57,7 @@ class TR_MetricServer {
 
 
       J9VMThread* getMetricServer() const { return _metricServer; }
-      void setmetricServer(J9VMThread* thread) { _metricServer = thread; }
+      void setMetricServer(J9VMThread* thread) { _metricServer = thread; }
 
       j9thread_t getMetricServerOSThread() const { return _metricServerOSThread; }
       TR::Monitor* getMetricServerMonitor() const { return _metricServerMonitor; }

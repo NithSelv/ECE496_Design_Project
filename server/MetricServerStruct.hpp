@@ -90,7 +90,7 @@ public:
          return Server::bindingFailed;
          }
       // Start listening
-      if (listen(this->_sockfd, SO_MAXCONN) < 0)
+      if (listen(this->_sockfd, SOMAXCONN) < 0)
          {
          perror("Metric Server: Socket Failed to Listen!");
          close(this->_sockfd);
