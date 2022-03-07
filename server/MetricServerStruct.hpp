@@ -109,7 +109,7 @@ public:
       if (this->_sockfd > 0)
          this->serverClose();
       this->_port = -1;
-      memset(this->_serverAddr, 0, sizeof(this->_serverAddr));
+      memset((void*)this->_serverAddr, 0, sizeof(this->_serverAddr));
       }
    
    void serverClose() 

@@ -170,7 +170,7 @@ std::vector<char> TR_MetricServerHandler::httpErrorCheck(HttpRequest req, Metric
    return rep.prepareHttpResponse();
    }
 
-static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* m) {
+static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, TR_MetricServer* m) {
    // Make sure that this server is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;

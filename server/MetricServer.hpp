@@ -49,7 +49,7 @@ class TR_MetricServer {
       void start(J9JITConfig *jitConfig);
       void stop();
 
-      void handleMetricRequests();
+      void handleMetricRequests(J9JITConfig *jitConfig);
       int32_t waitForMetricServerExit(J9JavaVM *javaVM);
 
       void setAttachAttempted(bool b) { _metricServerAttachAttempted = b; }
