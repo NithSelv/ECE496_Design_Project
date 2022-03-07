@@ -40,7 +40,7 @@ private:
    
 public:
 
-   std::string findMetric(const char* name) // changed return type from char* (unused so far)
+   std::string MetricsDatabase::findMetric(const char* name) // changed return type from char* (unused so far)
       {
       std::map<std::string, std::string>::iterator it = _mdb.find(name);
       if (it != _mdb.end())
@@ -56,7 +56,7 @@ public:
          }
       }
 
-   void setMetric(const char* name, char* value)
+   void MetricsDatabase::setMetric(const char* name, char* value)
       {
       std::map<std::string, std::string>::iterator it = this->_mdb.find(name);
       if (it != this->_mdb.end()) // found
@@ -69,7 +69,7 @@ public:
          }
       }
 
-   std::string prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
+   std::string MetricsDatabase::prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
       {
       std::string msg;
       for (std::map<std::string, std::string>::iterator it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
@@ -90,7 +90,7 @@ public:
          }
       }
 
-   void update(JITConfig* jitConfig)
+   void MetricsDatabase::update(J9JITConfig* jitConfig)
       {
       TR::CompilationInfo* cInfo = TR::CompilationInfo::get(jitConfig);
       CpuUtilization* cUtil = cInfo->getCpuUtil();

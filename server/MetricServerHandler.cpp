@@ -144,6 +144,32 @@ static SSL_CTX * createSSLContext(TR::PersistentInfo *info) {
    return ctx;
 }
 
+std::vector<char> TR_MetricServerHandler::httpErrorCheck(HttpRequest req, MetricsDatabase db)
+   {
+   HttpResponse rep;
+   int type = req.getType();
+   std::string metric(req.getMetric());
+
+   if (type != HttpRequest::httpGet)
+      {
+      rep.addHeaderField("", "HTTP/1.1 400 Bad Request");
+      rep.addBody("");
+      return rep.prepareHttpResponse();
+      }
+
+   if (metric.find("/metrics\0") == std::string::npos)
+      {
+      rep.addHeaderField("", "HTTP/1.1 404 Not Found");
+      rep.addBody("");
+      return rep.prepareHttpResponse();
+      }
+
+   rep.addHeaderField("", "HTTP/1.1 200 OK");
+   rep.addHeaderField("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+   rep.addBody(db.prepareAllMetricsBody());
+   return rep.prepareHttpResponse();
+   }
+
 static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* m) {
    // Make sure that this server is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
@@ -171,7 +197,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
    // Create the array of pollfds and client structures
    struct pollfd fds[JITSERVER_METRIC_SERVER_POLLFDS+1];
    Client clients[JITSERVER_METRIC_SERVER_POLLFDS];
-   fds[0].fd = server.getSockfd();
+   fds[0].fd = server.serverGetSockfd();
    fds[0].events = POLLIN;
    fds[0].revents = 0;
    // Keep a queue for free spots on the pollfd array
@@ -330,13 +356,13 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
          // There's some available spots, take one and use it to handle an incoming request.
          int new_index = newfds.back();
          // If accept fails, then reset fds and reset the clients[new_index-1]
-         if (clients[new_index-1].clientAccept(server.getSockfd(), sslCtx) < 0)
+         if (clients[new_index-1].clientAccept(server.serverGetSockfd(), sslCtx) < 0)
             {
                fds[0].revents = 0;
                clients[new_index-1].clientClear();
                break;
             }
-            fds[new_index].fd = clients[new_index-1].getSockfd();
+            fds[new_index].fd = clients[new_index-1].clientGetSockfd();
             fds[new_index].events = POLLIN;
             fds[new_index].revents = 0;
             newfds.pop_back();
@@ -364,29 +390,3 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, MetricServer* 
       (*OEVP_cleanup)();
       }
 }
-
-std::vector<char> httpErrorCheck(HttpRequest req, MetricsDatabase db)
-   {
-   HttpResponse rep;
-   int type = req.getType();
-   std::string metric(req.getMetric());
-
-   if (type != HttpRequest::httpGet)
-      {
-      rep.addHeaderField("", "HTTP/1.1 400 Bad Request");
-      rep.addBody("");
-      return rep.prepareHttpResponse();
-      }
-
-   if (metric.find("/metrics\0") == std::string::npos)
-      {
-      rep.addHeaderField("", "HTTP/1.1 404 Not Found");
-      rep.addBody("");
-      return rep.prepareHttpResponse();
-      }
-
-   rep.addHeaderField("", "HTTP/1.1 200 OK");
-   rep.addHeaderField("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-   rep.addBody(db.prepareAllMetricsBody());
-   return rep.prepareHttpResponse();
-   }
