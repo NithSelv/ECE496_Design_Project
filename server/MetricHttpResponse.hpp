@@ -30,7 +30,6 @@ class HttpResponse
    {
 private:
    std::vector<char> _msg;
-   //int bytes_written; // unused
    
 public:
    HttpResponse()

@@ -53,7 +53,7 @@ public:
       char* lastLine = strstr(req, "\r\n\r\n");
       if (lastLine == NULL)
          {
-         std::cout << "Error: Received a malformed request!" << std::endl;
+         perror("Metric Server: Received a malformed request!");
          return HttpRequest::invalidRequest;
          }
       char firstHeader[64];

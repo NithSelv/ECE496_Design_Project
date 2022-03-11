@@ -26,7 +26,12 @@
 #include <map>
 #include <iostream>
 #include <sys/resource.h>
-#include <time.h>
+#include "j9.h"
+#include "control/CompilationRuntime.hpp"
+#include "env/TRMemory.hpp"
+#include "env/VMJ9.h"
+#include "env/VerboseLog.hpp"
+#include "control/JITServerCompilationThread.hpp"
 
 // This class is used to add/update/store metrics for use by the server
 class MetricsDatabase
@@ -35,10 +40,6 @@ private:
    std::map<std::string, std::string> _mdb;
    
 public:
-   void addMetric(const char* name, char* value)
-      {
-      this->_mdb.insert(std::make_pair(name, value));
-      }
 
    std::string findMetric(const char* name) // changed return type from char* (unused so far)
       {
@@ -49,30 +50,30 @@ public:
          }
       else
          {
+         perror("Metric Server: Metric to be read not found!");
          std::string s;
          s.clear();
          return s; // not found
          }
       }
 
-   int setMetric(const char* name, char* value)
+   void setMetric(const char* name, char* value)
       {
       std::map<std::string, std::string>::iterator it = this->_mdb.find(name);
       if (it != this->_mdb.end()) // found
          {
          it->second = value;
-         return 0;
          }
       else
          {
-         return -1;
+         this->_mdb.insert(std::make_pair(name, value));
          }
       }
 
    std::string prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
       {
       std::string msg;
-      for (auto it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
+      for (std::map<std::string, std::string>::iterator it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
          {
          msg.append(it->first);
          msg.append(" ");
@@ -84,51 +85,52 @@ public:
 
    void print()
       {
-      for (auto it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
+      for (std::map<std::string, std::string>::iterator it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
          {
          std::cout << it->first << " => " << it->second << std::endl;
          }
       }
 
-   int initialize(double startTime)
+   void update(J9JITConfig* jitConfig)
       {
-      struct rusage stats;
-      struct timeval now;
+      TR::CompilationInfo* cInfo = TR::CompilationInfo::get(jitConfig);
+      CpuUtilization* cUtil = cInfo->getCpuUtil();
+
       char data[4096];
       memset((void*)data, 0, sizeof(data));
-      gettimeofday(&now, NULL);
-      int ret = getrusage(RUSAGE_SELF, &stats);
-      if (ret == 0)
-         {
-         double cpuTime = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-         sprintf(data, "%f", cpuTime);
-         this->addMetric("cpuTime", data);
-         memset((void*)data, 0, sizeof(data));
-         double calendarTime = now.tv_sec + 0.000001 * now.tv_usec - startTime;
-         sprintf(data, "%f", calendarTime);
-         this->addMetric("calendarTime", data);
-         }
-      return ret;
+      sprintf(data, "%d", cInfo->getMethodQueueSize());
+      this->setMetric("compilationQueueSize", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%u", cInfo->getClientSessionHT()->size());
+      this->setMetric("numberOfClients", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%d", cInfo->getNumUsableCompilationThreads());
+      this->setMetric("totalNumberOfCompilationThreads", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%d", cInfo->getNumCompThreadsActive());
+      this->setMetric("totalNumberOfActiveThreads", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%llu", (cInfo->computeAndCacheFreePhysicalMemory(incompInfo) >> 20));
+      this->setMetric("physicalMemoryFreeInMB", data); 
+
+      if (TR::CompilationInfoPerThreadRemote::getNumClearedCaches() > 0)
+      {
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%d", TR::CompilationInfoPerThreadRemote::getNumClearedCaches());
+      this->setMetric("numberOfClearedCaches", data);
       }
 
-   int update(double startTime)
+      if (cUtil->isFunctional())
       {
-      struct rusage stats;
-      struct timeval now;
-      char data[4096];
       memset((void*)data, 0, sizeof(data));
-      gettimeofday(&now, NULL);
-      int ret = getrusage(RUSAGE_SELF, &stats);
-      if (ret == 0)
-         {
-         double cpuTime = stats.ru_utime.tv_sec + 0.000001 * stats.ru_utime.tv_usec;
-         sprintf(data, "%f", cpuTime);
-         this->setMetric("cpuTime", data);
-         memset((void*)data, 0, sizeof(data));
-         double calendarTime = now.tv_sec + 0.000001 * now.tv_usec - startTime;
-         sprintf(data, "%f", calendarTime);
-         this->setMetric("calendarTime", data);
-         }
-      return ret;
+      sprintf(data, "%d", cUtil->getCpuUsage());
+      this->setMetric("percentCpuLoad", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%d", cUtil->getAvgCpuUsage());
+      this->setMetric("percentAverageCpuLoad", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%d", cUtil->getVmCpuUsage());
+      this->setMetric("percentJVMCpuLoad", data);
+      }
       }
    };
