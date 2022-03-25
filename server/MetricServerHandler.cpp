@@ -144,7 +144,7 @@ static SSL_CTX * createSSLContext(TR::PersistentInfo *info) {
    return ctx;
 }
 
-std::vector<char> TR_MetricServerHandler::httpErrorCheck(HttpRequest req, MetricsDatabase db)
+std::vector<char> httpErrorCheck(HttpRequest req, MetricDatabase db)
    {
    HttpResponse rep;
    int type = req.getType();
@@ -170,7 +170,7 @@ std::vector<char> TR_MetricServerHandler::httpErrorCheck(HttpRequest req, Metric
    return rep.prepareHttpResponse();
    }
 
-static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, TR_MetricServer* m) {
+void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* m) {
    // Make sure that this server is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
@@ -181,7 +181,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, TR_MetricServe
       }
 
    // We will use this object to store our metrics for reading and writing
-   MetricsDatabase db;
+   MetricDatabase db;
    // Initialize the database with the metrics extracted from jitserver
    db.update(jitConfig);
 
@@ -214,7 +214,7 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, TR_MetricServe
       {
       int check = 0;
       // Poll every few ms
-      check = poll(&fds, JITSERVER_METRIC_SERVER_POLLFDS+1, JITSERVER_METRIC_SERVER_TIMEOUT_USEC / 1000);
+      check = poll(fds, JITSERVER_METRIC_SERVER_POLLFDS+1, JITSERVER_METRIC_SERVER_TIMEOUT_USEC / 1000);
       if (m->getMetricServerExitFlag()) // if we are exiting, no need to check poll() status
          {
          break;
@@ -253,13 +253,13 @@ static void TR_MetricServerHandler::Start(J9JITConfig* jitConfig, TR_MetricServe
                   // There's some available spots, take one and use it to handle an incoming request.
                   int new_index = newfds.back();
                   // If accept fails, then reset fds and reset the clients[new_index-1]
-                  if (clients[new_index-1].clientAccept(server.getSockfd(), sslCtx) < 0)
+                  if (clients[new_index-1].clientAccept(server.serverGetSockfd(), sslCtx) < 0)
                      {
                      fds[0].revents = 0;
                      clients[new_index-1].clientClear();
                      break;
                      }
-                  fds[new_index].fd = clients[new_index-1].getSockfd();
+                  fds[new_index].fd = clients[new_index-1].clientGetSockfd();
                   fds[new_index].events = POLLIN;
                   fds[new_index].revents = 0;
                   newfds.pop_back();

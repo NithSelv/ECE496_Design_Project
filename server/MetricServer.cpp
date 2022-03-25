@@ -42,18 +42,22 @@
 //#include "net/LoadSSLLibs.hpp"
 #include "net/ServerStream.hpp"
 #include "runtime/CompileService.hpp"
-#include "runtime/MetricServer.hpp"
+//#include "runtime/MetricServer.hpp"
 #include "runtime/MetricServerHandler.hpp"
 
 TR_MetricServer::TR_MetricServer()
    : _metricServer(NULL), _metricServerMonitor(NULL), _metricServerOSThread(NULL), _metricServerAttachAttempted(false), _metricServerExitFlag(false) {
 }
 
+const TR_MetricServer* TR_MetricServer::getContext() {
+   return this;
+}
+
 // This function is where we need to run the server
 void TR_MetricServer::handleMetricRequests(J9JITConfig* jitConfig) {
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Running JITServer Metrics Server");
-   TR_MetricServerHandler::Start(jitConfig, this);
+   TR_MetricServerHandlerStart(jitConfig, this->getContext());
 }
 
 TR_MetricServer * TR_MetricServer::allocate() {

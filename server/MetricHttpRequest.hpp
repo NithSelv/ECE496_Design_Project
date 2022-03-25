@@ -39,78 +39,9 @@ public:
    enum HttpTypes {httpGet = 0, httpHead = 1, httpPost = 2, httpPut = 3, httpDelete = 4, httpPatch = 5, httpNa = -1};
    enum ParseError {invalidRequest = -1, success = 0};
    // Initialize all the fields to NULL
-   HttpRequest()
-      {
-      this->_type = HttpRequest::httpNa;
-      this->_metric[0] = '\0';
-      this->_connection[0] = '\0';
-      }
+   HttpRequest();
    // Take a string literal as the http request and get the desired fields
-   int parse(char* req)
-      {
-      long unsigned int numChars = strcspn(req, "\r");
-      char* starter = req;
-      char* lastLine = strstr(req, "\r\n\r\n");
-      if (lastLine == NULL)
-         {
-         perror("Metric Server: Received a malformed request!");
-         return HttpRequest::invalidRequest;
-         }
-      char firstHeader[64];
-      char* saveptr;
-      char type[16];
-      memset((void*)firstHeader, 0, sizeof(firstHeader));
-      memset((void*)type, 0, sizeof(type));
-      strncpy(firstHeader, req, std::min(numChars, sizeof(firstHeader)-1));
-      char* arg = strtok_r((char *)firstHeader, " ", (char **)&saveptr);
-      int i = 0;
-      while ((arg != NULL) && (i < 3))
-         {
-         if (i == 0)
-            {
-            if ((strlen(arg) == strlen("GET")) && (strcmp(arg, "GET") == 0))
-               this->_type = HttpRequest::httpGet;
-            else if ((strlen(arg) == strlen("HEAD")) && (strcmp(arg, "HEAD") == 0))
-               this->_type = HttpRequest::httpHead;
-            else if ((strlen(arg) == strlen("POST")) && (strcmp(arg, "POST") == 0))
-               this->_type = HttpRequest::httpPost;
-            else if ((strlen(arg) == strlen("PUT")) && (strcmp(arg, "PUT") == 0))
-               this->_type = HttpRequest::httpPut;
-            else if ((strlen(arg) == strlen("DELETE")) && (strcmp(arg, "DELETE") == 0))
-               this->_type = HttpRequest::httpDelete;
-            else if ((strlen(arg) == strlen("PATCH")) && (strcmp(arg, "PATCH") == 0))
-               this->_type = HttpRequest::httpPatch;
-            else
-               this->_type = HttpRequest::httpNa;
-            }
-         else if (i == 1)
-            {
-            strncpy(this->_metric, arg, std::min(strlen(arg)+1, sizeof(this->_metric)-1));
-            }
-         arg = strtok_r(NULL, " ", (char **)&saveptr);
-         i++;
-         }
-
-      starter += (numChars + 2);
-
-      while (starter < (lastLine+2))
-         {
-         numChars = strcspn(starter, "\r");
-         long unsigned int numFieldChars = strcspn(starter, ":");
-         char field[16];
-         memset((void*)field, 0, sizeof(field));
-         strncpy(field, starter, std::min(numFieldChars, sizeof(field)-1));
-         field[std::min(numFieldChars, sizeof(field)-1)] = '\0';
-         if ((strlen(field) == strlen("Connection")) && (strcmp(field, "Connection") == 0))
-            {
-            strncpy(this->_connection, starter+numFieldChars+2, std::min(numChars-numFieldChars-2, sizeof(this->_connection)-1));
-            this->_connection[std::min(strlen(field), sizeof(this->_connection)-1)] = '\0';
-            break;
-            }
-         starter += (numChars + 2);
-         }
-      return HttpRequest::success;
-      }
+   int parse(char* req);
    // These functions are used to access the stored fields
    int getType() const
       {

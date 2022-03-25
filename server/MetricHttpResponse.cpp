@@ -20,34 +20,36 @@
  * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 OR LicenseRef-GPL-2.0 WITH Assembly-exception
  *******************************************************************************/
 
-#include <cstdio>
-#include <cstring>
-#include <string>
-#include <map>
-#include <iostream>
-#include <sys/resource.h>
-#include "j9.h"
-#include "control/CompilationRuntime.hpp"
-#include "env/TRMemory.hpp"
-#include "env/VMJ9.h"
-#include "env/VerboseLog.hpp"
-#include "control/JITServerCompilationThread.hpp"
 
-// This class is used to add/update/store metrics for use by the server
-class MetricDatabase
+#include "MetricHttpResponse.hpp"
+
+HttpResponse::HttpResponse()
    {
-private:
-   std::map<std::string, std::string> _mdb;
-   
-public:
+   this->_msg.clear();
+   }
 
-   std::string findMetric(const char* name); // changed return type from char* (unused so far)
+void HttpResponse::addHeaderField(const char* field, const char* value)
+   {
+   if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0)))
+      {
+      this->_msg.insert(this->_msg.end(), field, field+strlen(field));
+      this->_msg.push_back(' ');
+      this->_msg.push_back(':');
+      this->_msg.push_back(' ');
+      }
+   this->_msg.insert(this->_msg.end(), value, value+strlen(value));
+   this->_msg.push_back('\r');
+   this->_msg.push_back('\n');
+   }
 
-   void setMetric(const char* name, char* value);
+void HttpResponse::addBody(std::string body)
+   {
+   this->_msg.push_back('\r');
+   this->_msg.push_back('\n');
+   this->_msg.insert(this->_msg.end(), body.begin(), body.end());
+   }
 
-   std::string prepareAllMetricsBody(); // changed return type from char* (used in server.cpp)
-
-   void print();
-
-   void update(J9JITConfig* jitConfig);
-   };
+std::vector<char> HttpResponse::prepareHttpResponse()
+   {
+   return this->_msg;
+   }
