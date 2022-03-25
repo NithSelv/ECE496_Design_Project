@@ -31,9 +31,6 @@
 
 #include "MetricServer.hpp"
 
-class TR_MetricServerHandler {
-   public:
-      void Start(J9JITConfig *jitConfig, TR_MetricServer* m);
-};
+void TR_MetricServerHandlerStart(J9JITConfig *jitConfig, TR_MetricServer const* m);
 
 #endif

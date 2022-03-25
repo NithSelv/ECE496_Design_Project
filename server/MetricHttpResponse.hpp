@@ -32,34 +32,11 @@ private:
    std::vector<char> _msg;
    
 public:
-   HttpResponse()
-      {
-      this->_msg.clear();
-      }
+   HttpResponse();
 
-   void addHeaderField(const char* field, const char* value)
-      {
-      if (!((strlen(field) == strlen("")) && (strcmp(field, "") == 0)))
-         {
-         this->_msg.insert(this->_msg.end(), field, field+strlen(field));
-         this->_msg.push_back(' ');
-         this->_msg.push_back(':');
-         this->_msg.push_back(' ');
-         }
-      this->_msg.insert(this->_msg.end(), value, value+strlen(value));
-      this->_msg.push_back('\r');
-      this->_msg.push_back('\n');
-      }
+   void addHeaderField(const char* field, const char* value);
 
-   void addBody(std::string body)
-      {
-      this->_msg.push_back('\r');
-      this->_msg.push_back('\n');
-      this->_msg.insert(this->_msg.end(), body.begin(), body.end());
-      }
+   void addBody(std::string body);
 
-   std::vector<char> prepareHttpResponse()
-      {
-      return this->_msg;
-      }
+   std::vector<char> prepareHttpResponse();
    };

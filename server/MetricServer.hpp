@@ -45,6 +45,7 @@ class TR_MetricServer {
 
    public:
       TR_MetricServer();
+      const TR_MetricServer* getContext();
       static TR_MetricServer* allocate();
       void start(J9JITConfig *jitConfig);
       void stop();
