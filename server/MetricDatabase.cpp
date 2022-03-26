@@ -53,6 +53,7 @@ void MetricDatabase::setMetric(const char* name, char* value)
 std::string MetricDatabase::prepareAllMetricsBody() // changed return type from char* (used in server.cpp)
    {
    std::string msg;
+   msg.clear();
    for (std::map<std::string, std::string>::iterator it=this->_mdb.begin(); it!=this->_mdb.end(); ++it)
       {
       msg.append(it->first);
