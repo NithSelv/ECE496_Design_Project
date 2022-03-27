@@ -157,16 +157,25 @@ std::vector<char> httpErrorCheck(HttpRequest req, MetricDatabase db)
       return rep.prepareHttpResponse();
       }
 
-   if (metric.find("/metrics\0") == std::string::npos)
+   if (((metric.find("/metrics\0") == std::string::npos)||(metric.find("%2Fmetrics\0") == std::string::npos)) && ((metric.find("/liveness\0") == std::string::npos)||(metric.find("%2Fliveness\0") == std::string::npos)))
       {
       rep.addHeaderField("", "HTTP/1.1 404 Not Found");
       rep.addBody("");
       return rep.prepareHttpResponse();
       }
 
+
    rep.addHeaderField("", "HTTP/1.1 200 OK");
    rep.addHeaderField("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-   rep.addBody(db.prepareAllMetricsBody());
+   if ((metric.find("/metrics\0") != std::string::npos)||(metric.find("%2Fmetrics\0") != std::string::npos))
+      {
+      rep.addBody(db.prepareAllMetricsBody());
+      }
+   else 
+      {
+      std::string s("");
+      rep.addBody(s);
+      }
    return rep.prepareHttpResponse();
    }
 

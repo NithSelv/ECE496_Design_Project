@@ -22,6 +22,9 @@
 
 #include "MetricClient.hpp"
 
+int SSL_write(SSL *ssl, void* buf, int num);
+int SSL_read(SSL *ssl, void*buf, int num);
+
 // This private function allows us to set the timeout for receiving messages.
 int Client::clientSetRecvTimeout(int timeout)
    {
@@ -137,16 +140,16 @@ int Client::clientReceive(int timeout)
    this->clientSetRecvTimeout(timeout);
    memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
    // We aren't using SSL
-   //if (this->_useSSL == 0)
-      //{
-   numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
-
-      //}
+   if (this->_useSSL == 0)
+      {
+      numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
+      }
    // We are using SSL
-   //else
-      //{
-      //numBytes = (*OBIO_read)(this->_bio, this->_recvBuffer, sizeof(this->_recvBuffer)-1);
-      //}
+   else
+      {
+      
+      numBytes = (*OBIO_read)(this->_bio, this->_recvBuffer, sizeof(this->_recvBuffer)-1);
+      }
          
    while (numBytes > 0)
       {
@@ -156,14 +159,14 @@ int Client::clientReceive(int timeout)
          numBytes = -1;
          continue;
          }
-      //if (this->_useSSL == 0)
-         //{
-      numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
-         //}
-      //else 
-         //{
-         //numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
-         //}
+      if (this->_useSSL == 0)
+         {
+         numBytes = recv(this->_sockfd, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1, 0);
+         }
+      else 
+         {
+         numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
+         }
       }
    if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
       {
@@ -186,27 +189,27 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
    int numBytes = 0;
    this->clientSetSendTimeout(timeout);
    // Don't use SSL
-   //if (this->_useSSL == 0)
-      //{
-   numBytes = send(this->_sockfd, &(sendBuffer[0]), sendBuffer.size(), 0);
-      //}
+   if (this->_useSSL == 0)
+      {
+      numBytes = send(this->_sockfd, &(sendBuffer[0]), sendBuffer.size(), 0);
+      }
    // Use SSL
-   //else
-      //{
-      //numBytes = (*OBIO_write)(this->_bio, &(sendBuffer[0]), sendBuffer.size());
-      //}
+   else
+      {
+      numBytes = (*OBIO_write)(this->_bio, &(sendBuffer[0]), sendBuffer.size());
+      }
 
    while (numBytes > 0)
       {
       totalBytes += numBytes;
-      //if (this->_useSSL == 0)
-         //{
-      numBytes = send(this->_sockfd, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes, 0);
-         //}
-      //else 
-         //{
-         //numBytes = (*OBIO_write)(this->_bio, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes);
-         //}
+      if (this->_useSSL == 0)
+         {
+         numBytes = send(this->_sockfd, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes, 0);
+         }
+      else 
+         {
+         numBytes = (*OBIO_write)(this->_bio, &(sendBuffer[totalBytes]), sendBuffer.size()-totalBytes);
+         }
       }
    if ((numBytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK)))
       {
