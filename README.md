@@ -37,11 +37,6 @@ The server can now obtain metrics from JITServer. In addition, as seen in the sa
 
 We plan to implement the following updates fairly soon:
 
-- (LOW PRIORITY) Add a test for memory leaks (NEED TO CHECK)
-- (LOW PRIORITY) (Additional Feature) Respond to liveliness props (i.e make sure the server can respond to requests that are used to check if the server is active)
-
-## Current To-do
-
-- Discuss Security (localhost, check IP, encrypt, password, etc.) (NEED TO CHECK) (SSL)
-- Handle case where http encoded in HEX
-- Enhance BASH script (e.g. # of connections within 10s)
+- (HIGH PRIORITY) SSL (TBD)
+- (HIGH PRIORITY) Enhance BASH script (e.g. # of connections within 10s, execute JITServer instead of local server code) (TBD)
+- (LOW PRIORITY) Add a test for memory leaks (TBD)
