@@ -29,6 +29,10 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include "env/VMJ9.h"
+#include "env/TRMemory.hpp"
+#include "env/VerboseLog.hpp"
+#include "control/CompilationRuntime.hpp"
 
 // This class is used to handle the server communications
 class Server

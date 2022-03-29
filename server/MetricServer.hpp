@@ -26,6 +26,7 @@
 #include "j9.h"
 #include "infra/Monitor.hpp"
 #include "net/ServerStream.hpp"
+#include "env/VerboseLog.hpp"
 
 //Implementation of a metric endpoint that runs on a separate thread 
 //1. Create an instance of the TR_MetricServer object with allocate()
