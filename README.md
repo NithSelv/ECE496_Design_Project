@@ -39,5 +39,3 @@ We plan to implement the following updates fairly soon:
 
 - (HIGH PRIORITY) SSL
 - (HIGH PRIORITY) Enhance BASH script (e.g. # of connections within 10s, execute JITServer instead of local server code)
-- (LOW PRIORITY) Move some print statements into TR::Verbose logs
-- (LOW PRIORITY) Move some defines into JITServer options
