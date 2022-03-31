@@ -25,7 +25,11 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <unistd.h>
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
 #include <sys/resource.h>
+#include <sys/sysinfo.h>
 #include "j9.h"
 #include "control/CompilationRuntime.hpp"
 #include "env/TRMemory.hpp"

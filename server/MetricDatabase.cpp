@@ -74,6 +74,7 @@ void MetricDatabase::print()
 
 void MetricDatabase::update(J9JITConfig* jitConfig)
    {
+   //These metrics are from JITServer
    TR::CompilationInfo* cInfo = TR::CompilationInfo::get(jitConfig);
    CpuUtilization* cUtil = cInfo->getCpuUtil();
 
@@ -113,5 +114,43 @@ void MetricDatabase::update(J9JITConfig* jitConfig)
       memset((void*)data, 0, sizeof(data));
       sprintf(data, "%d", cUtil->getVmCpuUsage());
       this->setMetric("percentJVMCpuLoad", data);
+      }
+
+   //These metrics are from the metric server thread
+   struct rusage r;
+   if (getrusage(RUSAGE_THREAD, (struct rusage*)&r) == 0)
+      {
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_maxrss);
+      this->setMetric("metricServerMaxPeakMemInKB", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_minflt);
+      this->setMetric("metricServerNumPageFaultNotIO", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_majflt);
+      this->setMetric("metricServerNumPageFaultByIO", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_inblock);
+      this->setMetric("metricServerNumInput", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_oublock);
+      this->setMetric("metricServerNumOutput", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_nvcsw);
+      this->setMetric("metricServerNumVolCS", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%li", r.ru_nivcsw);
+      this->setMetric("metricServerNumInVolCS", data);
+      }
+   memset((void*)data, 0, sizeof(data));
+   struct sysinfo s;
+   if (sysinfo((struct sysinfo*)&s) == 0) 
+      {
+      sprintf(data, "%lu", s.totalram);
+      this->setMetric("machineTotalUsageMemInB", data);
+      memset((void*)data, 0, sizeof(data));
+      sprintf(data, "%lu", s.freeram);
+      this->setMetric("machineTotalFreeMemInB", data);
+      memset((void*)data, 0, sizeof(data));
       }
    }
