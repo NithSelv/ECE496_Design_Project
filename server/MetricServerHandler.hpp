@@ -25,10 +25,6 @@
 
 //Implementation of a function that is responsible for running the metric server and handling connections between clients and the metric server
 
-#define JITSERVER_METRIC_SERVER_PORT 7380
-#define JITSERVER_METRIC_SERVER_TIMEOUT_MSEC 100
-#define JITSERVER_METRIC_SERVER_POLLFDS 10
-
 #include "MetricServer.hpp"
 
 void TR_MetricServerHandlerStart(J9JITConfig *jitConfig, TR_MetricServer const* m);

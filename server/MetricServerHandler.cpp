@@ -40,6 +40,11 @@
 #include <vector>
 #include <openssl/err.h>
 #include <sys/un.h>
+//#include "control/Options.hpp"
+#include "env/ClassLoaderTable.hpp"
+#include "env/annotations/AnnotationBase.hpp"
+#include "env/ut_j9jit.h"
+#include "jvminit.h"
 #include "MetricDatabase.hpp"
 #include "MetricHttpRequest.hpp"
 #include "MetricHttpResponse.hpp"
@@ -188,6 +193,37 @@ std::vector<char> httpErrorCheck(HttpRequest req, MetricDatabase db)
    }
 
 void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* m) {
+   J9JavaVM* vm = jitConfig->javaVM;
+   // First make sure to get the options specified by the user
+   int metricPort=7390;
+   int metricTimeout=100;
+   int metricMaxConnections=10;
+
+   const char* arg1 = "-XX:MetricServerPort=";
+   const char* arg2 = "-XX:MetricServerTimeoutMs=";
+   const char* arg3 = "-XX:MetricServerMaxConnections=";
+
+   int metricPortIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg1, 0);
+   int metricTimeoutIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg2, 0);
+   int metricMaxConnectionsIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg3, 0);
+
+   if (metricPortIdx >= 0) 
+      {
+      GET_INTEGER_VALUE(metricPortIdx, arg1, metricPort);
+      metricPort = (metricPort > 0) ? metricPort : 7390;
+      }
+   if (metricTimeoutIdx >= 0)
+      {
+      GET_INTEGER_VALUE(metricTimeoutIdx, arg2, metricTimeout);
+      metricTimeout = (metricTimeout > 0) ? metricTimeout : 100;
+      }
+   if (metricMaxConnectionsIdx >= 0)
+      {
+      GET_INTEGER_VALUE(metricMaxConnectionsIdx, arg3, metricMaxConnections);
+      metricMaxConnections = (metricMaxConnections > 0) ? metricMaxConnections : 10;
+      }
+
+
    // Make sure that this server is SSL encrypted
    TR::PersistentInfo *info = getCompilationInfo(jitConfig)->getPersistentInfo();
    SSL_CTX *sslCtx = NULL;
@@ -205,7 +241,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Metrics initialized!\n");
 
    // This server object will handle the listening of connections
-   Server server = Server(JITSERVER_METRIC_SERVER_PORT);
+   Server server = Server(metricPort);
 
    // Start the server
    if (server.serverStart() < 0)
@@ -231,7 +267,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
       {
       int check = 0;
       // Poll every few ms
-      check = poll(&fds[0], fds.size(), JITSERVER_METRIC_SERVER_TIMEOUT_MSEC);
+      check = poll(&fds[0], fds.size(), metricTimeout);
       if (m->getMetricServerExitFlag()) // if we are exiting, no need to check poll() status
          {
          if (TR::Options::getVerboseOption(TR_VerboseJITServer))

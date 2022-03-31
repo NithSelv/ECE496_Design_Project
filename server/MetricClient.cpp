@@ -137,7 +137,7 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
          }
          else 
          {
-            this->_useSSL = 1;
+            //this->_useSSL = 1;
          }
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
