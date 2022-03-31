@@ -318,6 +318,10 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
                fds[0].revents = 0;
                client.clientClear();
                }
+            else if (clients.size() > metricMaxConnections)
+               {
+               break;
+               }
             else 
                {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
