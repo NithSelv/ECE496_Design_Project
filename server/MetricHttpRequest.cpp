@@ -36,6 +36,8 @@ int HttpRequest::parse(char* req)
    char* lastLine = strstr(req, "\r\n\r\n");
    if (lastLine == NULL)
       {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Received Malformed Http Request!\n");
       perror("Metric Server: Received a malformed request!");
       return HttpRequest::invalidRequest;
       }

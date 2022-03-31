@@ -24,6 +24,7 @@
 #include <cstring>
 #include <vector>
 #include <iostream>
+#include "env/VerboseLog.hpp"
 
 //This is a class that is used to prepare the HTTP Response by adding http headers and the body and then setting up the correct format
 class HttpResponse
