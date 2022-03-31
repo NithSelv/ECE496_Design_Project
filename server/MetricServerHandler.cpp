@@ -159,7 +159,7 @@ std::vector<char> httpErrorCheck(HttpRequest req, MetricDatabase db)
       return rep.prepareHttpResponse();
       }
 
-   if (((metric.find("/metrics\0") == std::string::npos)||(metric.find("%2Fmetrics\0") == std::string::npos)) && ((metric.find("/liveness\0") == std::string::npos)||(metric.find("%2Fliveness\0") == std::string::npos)))
+   if (((metric.find("/metrics\0") == std::string::npos)&&(metric.find("%2Fmetrics\0") == std::string::npos)) && ((metric.find("/liveness\0") == std::string::npos)&&(metric.find("%2Fliveness\0") == std::string::npos)))
       {
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: HTTP 404 Not Found: Did Not Receive Liveness probe or Metric Request!\n");
