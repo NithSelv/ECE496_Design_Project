@@ -32,6 +32,8 @@ int Client::clientSetRecvTimeout(int timeout)
    this->_recvTimer.tv_usec = timeout;
    if (setsockopt(this->_sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&(this->_recvTimer), sizeof(this->_recvTimer)) < 0)
       {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to set receive timeout!\n");
       perror("Metric Server: Failed to set timeout!");
       close(this->_sockfd);
       return Client::timeoutFailed;
@@ -46,7 +48,9 @@ int Client::clientSetSendTimeout(int timeout)
    this->_sendTimer.tv_usec = timeout;
    if (setsockopt(this->_sockfd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&(this->_sendTimer), sizeof(this->_sendTimer)) < 0)
       {
-      perror("Metric Server: Failed to set timeout!");
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to set send timeout!\n");
+      perror("Metric Server: Failed to set send timeout!");
       close(this->_sockfd);
       return Client::timeoutFailed;
       }
@@ -110,10 +114,14 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
       {
          if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
             {
+            if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+               TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to connect to client!\n");
             perror("Metric Server: Failed to connect to client!");
             }
          else
             {
+            if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+               TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Connection request timed out!\n");
             perror("Metric Server: Connection timed out!");
             }
          return Client::acceptFailed;
@@ -122,14 +130,18 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
       {
          if (!acceptOpenSSLConnection(sslCtx, this->_sockfd, this->_bio))
          {
+            if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+               TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to connect with SSL!\n");
             perror("Metric Server: Failed to connect to client using SSL!");
             return Client::acceptFailed;
          }
          else 
          {
-            this->_useSSL = 1;
+            //this->_useSSL = 1;
          }
       }
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client connection was accepted!\n");
    return Client::success;
    }
 // Add a timeout for receving messages and store the received message in the buffer
@@ -170,16 +182,22 @@ int Client::clientReceive(int timeout)
       }
    if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
       {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Receive failed!\n");
       perror("Metric Server: Failed to receive msg!");
       close(this->_sockfd);
       return Client::receiveFailed;
       }
    if (totalBytes == 0) 
       {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client killed connection or connection timed out!\n");
       close(this->_sockfd);
       return Client::receiveFailed;
       }
    this->_recvBuffer[totalBytes] = '\0';
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client msg received!\n");
    return Client::success;
    }
 // Add a timeout for sending messages and send it
@@ -213,11 +231,14 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
       }
    if ((numBytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK)))
       {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Send failed!\n");
       perror("Metric Server: Failed to send msg!");
       close(this->_sockfd);
       return Client::sendFailed;
       }
-      
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client msg sent!\n");
    return Client::success;
    }
 // Return the received message 
@@ -241,6 +262,8 @@ void Client::clientClear()
    memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
    memset((void*)&(this->_clientAddr), 0, sizeof(this->_clientAddr));
    this->_clientAddrSize = 0;
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Clearing client info!\n");
    }
 // Remember to close the connection once finished
 // Structures go out of scope so no need for memory cleanup
@@ -248,4 +271,6 @@ void Client::clientClose()
    {
    close(this->_sockfd);
    this->_sockfd = -1;
+   if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+      TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closed client fd!\n");
    }

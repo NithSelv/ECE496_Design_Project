@@ -23,6 +23,10 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include "env/VMJ9.h"
+#include "env/TRMemory.hpp"
+#include "env/VerboseLog.hpp"
+#include "control/CompilationRuntime.hpp"
 
 // This class is used to parse the HTTP Request and query for results
 class HttpRequest
