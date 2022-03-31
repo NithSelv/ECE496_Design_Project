@@ -26,6 +26,7 @@ As of March, 27th, 2022, the current tasks have been implemented in the HTTP ser
   - `404 Resource Not Found` is sent if the client performs a GET request for an invalid endpoint
   - `200 Ok` is sent if the above issues do not occur, the Content-Type is text/plain, and the body includes all the metrics formatted as `metric_name metric_value` where each metric is separated by a new line character 
 - Server can function within JITServer open-source project  
+- Server returns the desired metrics from JITServer and metrics related to itself and the host machine
 
 ## Testing
 
