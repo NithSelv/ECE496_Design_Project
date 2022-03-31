@@ -33,7 +33,7 @@ The server can now obtain metrics from JITServer. In addition, as seen in the sa
 
 ![image](https://user-images.githubusercontent.com/46902009/143985492-37beb3c9-34eb-4e86-b305-19ac1f578a78.png)
 
-## Future Updates
+## Upcoming Features
 
 We plan to implement the following updates fairly soon:
 
