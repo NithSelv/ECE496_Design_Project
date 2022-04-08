@@ -22,9 +22,6 @@
 
 #include "MetricClient.hpp"
 
-int SSL_write(SSL *ssl, void* buf, int num);
-int SSL_read(SSL *ssl, void*buf, int num);
-
 // This private function allows us to set the timeout for receiving messages.
 int Client::clientSetRecvTimeout(int timeout)
    {
@@ -106,7 +103,7 @@ bool Client::acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio)
    }
 
 // Accept the connection and populate the client structures
-int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
+int Client::clientAccept(int serverSock, SSL_CTX* sslCtx, int timeout)
    {
    this->_sslCtx = sslCtx;
    this->_sockfd = accept(serverSock, (struct sockaddr *)&(this->_clientAddr), (socklen_t *)&(this->_clientAddrSize));
@@ -126,6 +123,8 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
             }
          return Client::acceptFailed;
       }
+   this->clientSetRecvTimeout(timeout);
+   this->clientSetSendTimeout(timeout);
    if (sslCtx != NULL) 
       {
          if (!acceptOpenSSLConnection(sslCtx, this->_sockfd, this->_bio))
@@ -137,7 +136,8 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
          }
          else 
          {
-            //this->_useSSL = 1;
+            
+            this->_useSSL = 1;
          }
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -149,20 +149,18 @@ int Client::clientReceive(int timeout)
    {
    int totalBytes = 0;
    int numBytes = 0;
-   this->clientSetRecvTimeout(timeout);
    memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
    // We aren't using SSL
    if (this->_useSSL == 0)
       {
-      numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
+      numBytes = recv(this->_sockfd, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-1, 0);
       }
    // We are using SSL
    else
       {
-      
-      numBytes = (*OBIO_read)(this->_bio, this->_recvBuffer, sizeof(this->_recvBuffer)-1);
-      }
-         
+      numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-1);
+      } 
+   //char* data = static_cast<char*>((void*)(this->_recvBuffer));
    while (numBytes > 0)
       {
       totalBytes += numBytes;
@@ -180,11 +178,18 @@ int Client::clientReceive(int timeout)
          numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
          }
       }
-   if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
+   if ((numBytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK)))
       {
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Receive failed!\n");
-      perror("Metric Server: Failed to receive msg!");
+      if (this->_useSSL)
+         {
+         (*OERR_print_errors_fp)(stderr);
+         }
+      else
+         {
+         perror("Metric Server: Failed to receive msg!");
+         }
       close(this->_sockfd);
       return Client::receiveFailed;
       }
@@ -205,7 +210,6 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
    {
    int totalBytes = 0;
    int numBytes = 0;
-   this->clientSetSendTimeout(timeout);
    // Don't use SSL
    if (this->_useSSL == 0)
       {
@@ -233,7 +237,14 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
       {
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Send failed!\n");
-      perror("Metric Server: Failed to send msg!");
+      if (this->_useSSL)
+         {
+         (*OERR_print_errors_fp)(stderr);
+         }
+      else 
+         {
+         perror("Metric Server: Failed to send msg!");
+         }
       close(this->_sockfd);
       return Client::sendFailed;
       }

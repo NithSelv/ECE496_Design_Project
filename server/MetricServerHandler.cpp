@@ -45,6 +45,7 @@
 #include "env/annotations/AnnotationBase.hpp"
 #include "env/ut_j9jit.h"
 #include "jvminit.h"
+#include "net/LoadSSLLibs.hpp"
 #include "MetricDatabase.hpp"
 #include "MetricHttpRequest.hpp"
 #include "MetricHttpResponse.hpp"
@@ -56,7 +57,6 @@
 #include "env/VMJ9.h"
 #include "env/VerboseLog.hpp"
 #include "net/CommunicationStream.hpp"
-#include "net/LoadSSLLibs.hpp"
 #include "net/ServerStream.hpp"
 #include "runtime/CompileService.hpp"
 
@@ -198,29 +198,57 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
    int metricPort=7390;
    int metricTimeout=100;
    int metricMaxConnections=10;
+   int metricHttpsPort=7391;
 
    const char* arg1 = "-XX:MetricServerPort=";
    const char* arg2 = "-XX:MetricServerTimeoutMs=";
    const char* arg3 = "-XX:MetricServerMaxConnections=";
+   const char* arg4 = "-XX:MetricHttpsPort=";
 
    int metricPortIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg1, 0);
    int metricTimeoutIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg2, 0);
    int metricMaxConnectionsIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg3, 0);
+   int metricHttpsPortIdx = FIND_ARG_IN_VMARGS(STARTSWITH_MATCH, arg4, 0);
 
    if (metricPortIdx >= 0) 
       {
       GET_INTEGER_VALUE(metricPortIdx, arg1, metricPort);
-      metricPort = (metricPort > 0) ? metricPort : 7390;
+      if (metricPort <= 0)
+         {
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Invalid Argument: Port!\n");
+         perror("Error: Invalid Number for Port!");
+         exit(1);
+         }
       }
    if (metricTimeoutIdx >= 0)
       {
       GET_INTEGER_VALUE(metricTimeoutIdx, arg2, metricTimeout);
-      metricTimeout = (metricTimeout > 0) ? metricTimeout : 100;
+      if (metricTimeout <= 0)
+         {
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Invalid Argument: Timeout!\n");
+         perror("Error: Invalid Number for Timeout!");
+         exit(1);
+         }
       }
    if (metricMaxConnectionsIdx >= 0)
       {
       GET_INTEGER_VALUE(metricMaxConnectionsIdx, arg3, metricMaxConnections);
-      metricMaxConnections = (metricMaxConnections > 0) ? metricMaxConnections : 10;
+      if (metricMaxConnections <= 0)
+         {
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Invalid Argument: Max Number of Connections!\n");
+         perror("Error: Invalid Number for Max Connections!");
+         exit(1);
+         }
+      }
+   if (metricHttpsPortIdx >= 0) 
+      {
+      GET_INTEGER_VALUE(metricHttpsPortIdx, arg4, metricHttpsPort);
+      if (metricHttpsPort <= 0)
+         {
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Invalid Argument: Https Port!\n");
+         perror("Error: Invalid Number for Https Port!");
+         exit(1);
+         }
       }
 
 
@@ -240,8 +268,11 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Metrics initialized!\n");
 
-   // This server object will handle the listening of connections
+   // This server object will handle the listening of Http connections
    Server server = Server(metricPort);
+
+   // This server object will handle the listening of Https connections
+   Server serverHttps = Server(metricHttpsPort);
 
    // Start the server
    if (server.serverStart() < 0)
@@ -250,6 +281,14 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to start!\n");
       exit(1);
       }
+   if (serverHttps.serverStart() < 0)
+      {
+      if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+         TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Https Metric Server: Failed to start!\n");
+      exit(1);
+      }
+
+
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Started Metric Server!\n");
    
@@ -260,6 +299,11 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
    init_fd.events = POLLIN;
    init_fd.revents = 0;
    fds.push_back(init_fd);
+   struct pollfd init_fd_https;
+   init_fd_https.fd = serverHttps.serverGetSockfd();
+   init_fd_https.events = POLLIN;
+   init_fd_https.revents = 0;
+   fds.push_back(init_fd_https);
 
    std::vector<Client> clients;
 
@@ -296,7 +340,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
             exit(1);
             }
          }
-      else if ((fds[0].revents != POLLIN) && (fds[0].revents != 0))
+      else if (((fds[0].revents != POLLIN) && (fds[0].revents != 0))||((fds[1].revents != POLLIN) && (fds[1].revents != 0)))
          {
          fprintf(stderr, "Metric Server: Unexpected event occurred during poll for new metric server connection: revents=%d\n", fds[0].revents);
          if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -304,24 +348,29 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
          exit(1);
          }
       int newfd = 0;
-      // Prepare to accept new connections
+      int newfd_https = 0;
+      // Prepare to accept new http connections
       if (fds[0].revents == POLLIN) 
          {
             
             // If accept fails, then reset fds and reset the clients[new_index-1]
             Client client;
             pollfd pfd;
-            if (client.clientAccept(server.serverGetSockfd(), sslCtx) < 0)
+            if (client.clientAccept(server.serverGetSockfd(), NULL, 1) < 0)
                {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to accept connection!\n");
+                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to accept http connection!\n");
                fds[0].revents = 0;
                client.clientClear();
+               }
+            else if (clients.size() > metricMaxConnections)
+               {
+               break;
                }
             else 
                {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Accepting new connection!\n");
+                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Accepting new http connection!\n");
                pfd.fd = client.clientGetSockfd();
                newfd = pfd.fd;
                pfd.events = POLLIN;
@@ -331,12 +380,43 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
                fds[0].revents = 0;
                }
          }
+      // Prepare to accept new https connections
+      if (fds[1].revents == POLLIN) 
+         {
+            
+            // If accept fails, then reset fds and reset the clients[new_index-1]
+            Client client;
+            pollfd pfd;
+            if (client.clientAccept(serverHttps.serverGetSockfd(), sslCtx, 1) < 0)
+               {
+               if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to accept https connection!\n");
+               fds[0].revents = 0;
+               client.clientClear();
+               }
+            else if (clients.size() > metricMaxConnections)
+               {
+               break;
+               }
+            else 
+               {
+               if (TR::Options::getVerboseOption(TR_VerboseJITServer))
+                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Accepting new https connection!\n");
+               pfd.fd = client.clientGetSockfd();
+               newfd_https = pfd.fd;
+               pfd.events = POLLIN;
+               pfd.revents = 0;
+               fds.push_back(pfd);
+               clients.push_back(client);
+               fds[1].revents = 0;
+               }
+         }
       // Update the database
       db.update(jitConfig);
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Updated metrics!\n");
       // Prepare to handle requests from accepted connections
-      for (int i = 1; i < fds.size(); i++) 
+      for (int i = 2; i < fds.size(); i++) 
       {
          // Received incoming data
          if ((fds[i].fd > 0) && (fds[i].revents == POLLIN))
@@ -345,29 +425,29 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
             HttpRequest req;
 
             // Receive the msg from the client/Prometheus
-            if (clients[i-1].clientReceive(1) < 0)
+            if (clients[i-2].clientReceive(1) < 0)
             {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
                   TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to receive msg!\n");
                // Clears the structure for reuse and closes the socket
-               clients[i-1].clientClear();
+               clients[i-2].clientClear();
                // Reset this pollfd
                fds[i].fd = -1;
                fds[i].events = 0;
                fds[i].revents = 0;
+               std::cout << "Failed to recv msg!" << std::endl;
                continue;
             }
             if (TR::Options::getVerboseOption(TR_VerboseJITServer))
                TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Received msg!\n");
-
             // Parse the std::string into the http request object
-            char* data = clients[i-1].clientGetRecvMsg();
+            char* data = clients[i-2].clientGetRecvMsg();
             if (req.parse(data) < 0)
                {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
-                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Invalid Http Request received!\n");
+                  TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Invalid Request received!\n");
                // Clears the structure for reuse and closes the socket
-               clients[i-1].clientClear();
+               clients[i-2].clientClear();
                // Reset this pollfd
                fds[i].fd = -1;
                fds[i].events = POLLIN;
@@ -380,12 +460,12 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
 
             // Verify that the http request is valid and then
             // send back the response
-            if (clients[i-1].clientSend(send_buffer, 1) < 0)
+            if (clients[i-2].clientSend(send_buffer, 1) < 0)
                {
                if (TR::Options::getVerboseOption(TR_VerboseJITServer))
                   TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Failed to send msg!\n");
                // Clears the structure for reuse and closes the socket
-               clients[i-1].clientClear();
+               clients[i-2].clientClear();
                // Reset this pollfd
                fds[i].fd = -1;
                fds[i].events = POLLIN;
@@ -408,19 +488,19 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
             if (TR::Options::getVerboseOption(TR_VerboseJITServer))
                TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closing client connection!\n");
             // Clears the structure for reuse and closes the socket
-            clients[i-1].clientClear();
+            clients[i-2].clientClear();
             // Reset this pollfd
             fds[i].fd = -1;
             fds[i].events = POLLIN;
             fds[i].revents = 0;
          }
          // They closed the connection on us, so kill the connection
-         else if ((fds[i].fd > 0) && ((fds[i].revents == POLLHUP)||((fds[i].fd != newfd)&&(fds[i].revents == 0))))
+         else if ((fds[i].fd > 0) && ((fds[i].revents == POLLHUP)||((fds[i].fd != newfd)&&(fds[i].revents == 0))) && ((fds[i].fd != newfd_https)&&(fds[i].revents == 0)))
          {
             if (TR::Options::getVerboseOption(TR_VerboseJITServer))
                TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closing socket for killed connection!\n");
             // Clears the structure for reuse and closes the socket
-            clients[i-1].clientClear();
+            clients[i-2].clientClear();
             // Reset this pollfd
             fds[i].fd = -1;
             fds[i].events = POLLIN;
@@ -434,7 +514,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
          if (fds[idx].fd < 0)
             {
             fds.erase(fds.begin()+idx);
-            clients.erase(clients.begin()+idx-1);
+            clients.erase(clients.begin()+idx-2);
             }
          else
             {
@@ -443,6 +523,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
          }
    }
    // Close down any open clients and clear any info
+   fds.erase(fds.begin());
    fds.erase(fds.begin());
 
    for (int i = (fds.size()-1); i >= 0; i--) 
@@ -454,6 +535,7 @@ void TR_MetricServerHandlerStart(J9JITConfig* jitConfig, TR_MetricServer const* 
 
    // Close down the server and clear any info
    server.serverClear();
+   serverHttps.serverClear();
 
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closed all open sockets!\n");
