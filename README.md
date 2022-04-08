@@ -6,7 +6,7 @@ The goal of this project is to design a HTTP server that can act as a liasion be
 
 ## Description
 
-This can be done by allowing a Prometheus instance to send HTTP requests to the server (which will be running on a port specified in the Prometheus config file) which will allow it to scrape metrics from the endpoint. The server should provide those metrics from JITServer and return them to Prometheus in a valid HTTP Response. 
+This can be done by allowing a Prometheus instance to send HTTP requests to the server (which will be running on a port specified in the Prometheus config file) which will allow it to scrape metrics from the endpoint. The server should provide those metrics from JITServer and return them to Prometheus in a valid HTTP Response. HTTPS can be configured on Prometheus as well for added security.
 
 ## Server Diagram
 
@@ -27,16 +27,16 @@ As of March, 27th, 2022, the current tasks have been implemented in the HTTP ser
   - `200 Ok` is sent if the above issues do not occur, the Content-Type is text/plain, and the body includes all the metrics formatted as `metric_name metric_value` where each metric is separated by a new line character 
 - Server can function within JITServer open-source project  
 - Server returns the desired metrics from JITServer and metrics related to itself and the host machine
+- Server can use HTTP or HTTPS to have metrics scraped
 
 ## Testing
 
-The server can now obtain metrics from JITServer. In addition, as seen in the sample image below, we are able to display metrics that change over time. The computation of the metrics is done by our server for now and it is stored in a Metrics_Database object. 
+The server can now obtain metrics from JITServer. In addition, as seen in the sample image below, we are able to display metrics that change over time. The computation of the metrics is done by our server for now and it is stored in a Metrics_Database object. The metrics can be scraped using HTTP or HTTPS.
 
 ![image](https://user-images.githubusercontent.com/46902009/143985492-37beb3c9-34eb-4e86-b305-19ac1f578a78.png)
 
 ## Upcoming Features
 
 We plan to implement the following updates fairly soon:
-
-- (HIGH PRIORITY) SSL
+- (HIGH PRIORITY) Set up demo
 - (HIGH PRIORITY) Enhance BASH script (e.g. # of connections within 10s, execute JITServer instead of local server code)
