@@ -71,7 +71,7 @@ public:
    bool acceptOpenSSLConnection(SSL_CTX *sslCtx, int connfd, BIO *&bio);
 
    // Accept the connection and populate the client structures
-   int clientAccept(int serverSock, SSL_CTX* sslCtx);
+   int clientAccept(int serverSock, SSL_CTX* sslCtx, int timeout);
    // Add a timeout for receving messages and store the received message in the buffer
    int clientReceive(int timeout);
    // Add a timeout for sending messages and send it
