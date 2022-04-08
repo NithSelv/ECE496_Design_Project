@@ -136,7 +136,6 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx, int timeout)
          }
          else 
          {
-            
             this->_useSSL = 1;
          }
       }
@@ -191,6 +190,8 @@ int Client::clientReceive(int timeout)
          perror("Metric Server: Failed to receive msg!");
          }
       close(this->_sockfd);
+      if (this->_useSSL > 0)
+         (*OBIO_free_all)(this->_bio);
       return Client::receiveFailed;
       }
    if (totalBytes == 0) 
@@ -198,6 +199,10 @@ int Client::clientReceive(int timeout)
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client killed connection or connection timed out!\n");
       close(this->_sockfd);
+      this->_sockfd = -1;
+      if (this->_bio != NULL)
+         (*OBIO_free_all)(this->_bio);
+      this->_bio = NULL;
       return Client::receiveFailed;
       }
    this->_recvBuffer[totalBytes] = '\0';
@@ -246,6 +251,10 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
          perror("Metric Server: Failed to send msg!");
          }
       close(this->_sockfd);
+      this->_sockfd = -1;
+      if (this->_bio != NULL)
+         (*OBIO_free_all)(this->_bio);
+      this->_bio = NULL;
       return Client::sendFailed;
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -262,12 +271,16 @@ int Client::clientGetSockfd()
    {
    return this->_sockfd;
    }
+// Return whether or not the client uses SSL
+int Client::clientGetUseSSL()
+   {
+   return this->_useSSL;
+   }
 // Clear the client structure for reuse
 void Client::clientClear() 
    {
    if (this->_sockfd > 0)
       this->clientClose();
-   this->_bio = NULL;
    this->_sslCtx = NULL;
    this->_useSSL = 0;
    memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
@@ -281,7 +294,10 @@ void Client::clientClear()
 void Client::clientClose()
    {
    close(this->_sockfd);
+   if (this->_bio != NULL)
+      (*OBIO_free_all)(this->_bio);
    this->_sockfd = -1;
+   this->_bio = NULL;
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closed client fd!\n");
    }
