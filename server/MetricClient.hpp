@@ -80,6 +80,8 @@ public:
    char* clientGetRecvMsg();
    // Return client sockfd
    int clientGetSockfd();
+   // Return whether or not the client uses SSL
+   int clientGetUseSSL();
    // Clear the client structure for reuse
    void clientClear();
    // Remember to close the connection once finished

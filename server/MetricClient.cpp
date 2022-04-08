@@ -271,6 +271,11 @@ int Client::clientGetSockfd()
    {
    return this->_sockfd;
    }
+// Return whether or not the client uses SSL
+int Client::clientGetUseSSL()
+   {
+   return this->_useSSL;
+   }
 // Clear the client structure for reuse
 void Client::clientClear() 
    {
