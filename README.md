@@ -2,7 +2,7 @@
 
 ## Goal
 
-The goal of this project is to design a HTTP server that can act as a liasion between Prometheus and the Open-Source JITServer project.
+The goal of this project is to design a HTTP/HTTPS server that can act as a liasion between Prometheus and the Open-Source JITServer project.
 
 ## Description
 
