@@ -62,6 +62,7 @@ int Server::serverStart()
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to set socket option: SO_REUSEADDR!\n");
       perror("Metric Server: Can't set SO_REUSEADDR!");
       close(this->_sockfd);
+      this->_sockfd = -1;
       return Server::socketOptionFailed;
       }
 
@@ -71,6 +72,7 @@ int Server::serverStart()
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to set socket option: SO_KEEPALIVE!\n");
       perror("Metric Server: Can't set SO_KEEPALIVE!");
       close(this->_sockfd);
+      this->_sockfd = -1;
       return Server::socketOptionFailed;
       }
 
@@ -81,6 +83,7 @@ int Server::serverStart()
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Failed to bind server fd!\n");
       perror("Metric Server: Socket Binding Failed!");
       close(this->_sockfd);
+      this->_sockfd = -1;
       return Server::bindingFailed;
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -92,6 +95,7 @@ int Server::serverStart()
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Server failed to listen for incoming connections!\n");
       perror("Metric Server: Socket Failed to Listen!");
       close(this->_sockfd);
+      this->_sockfd = -1;
       return Server::listeningFailed;
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -116,7 +120,8 @@ void Server::serverClear()
    
 void Server::serverClose() 
    {
-   close(this->_sockfd);
+   if (this->_sockfd > 0)
+      close(this->_sockfd);
    this->_sockfd = -1;
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Closing server fd!\n");
