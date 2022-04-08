@@ -36,9 +36,7 @@
 #include "env/TRMemory.hpp"
 #include "env/VMJ9.h"
 #include "env/VerboseLog.hpp"
-#include <openssl/bio.h>
-#include <openssl/ssl.h>
-
+#include "net/ServerStream.hpp"
 // This class is used to handle the client communications
 class Client
    {

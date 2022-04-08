@@ -22,9 +22,6 @@
 
 #include "MetricClient.hpp"
 
-int SSL_write(SSL *ssl, void* buf, int num);
-int SSL_read(SSL *ssl, void*buf, int num);
-
 // This private function allows us to set the timeout for receiving messages.
 int Client::clientSetRecvTimeout(int timeout)
    {
@@ -137,7 +134,8 @@ int Client::clientAccept(int serverSock, SSL_CTX* sslCtx)
          }
          else 
          {
-            //this->_useSSL = 1;
+            
+            this->_useSSL = 1;
          }
       }
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
@@ -149,20 +147,24 @@ int Client::clientReceive(int timeout)
    {
    int totalBytes = 0;
    int numBytes = 0;
-   this->clientSetRecvTimeout(timeout);
+   //ServerStream s = ServerStream(this->_sockfd, this->_bio);
+   //this->clientSetRecvTimeout(timeout);
    memset(this->_recvBuffer, 0, sizeof(this->_recvBuffer));
    // We aren't using SSL
    if (this->_useSSL == 0)
       {
-      numBytes = recv(this->_sockfd, this->_recvBuffer, sizeof(this->_recvBuffer)-1, 0);
+      numBytes = recv(this->_sockfd, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-1, 0);
       }
    // We are using SSL
    else
       {
-      
-      numBytes = (*OBIO_read)(this->_bio, this->_recvBuffer, sizeof(this->_recvBuffer)-1);
-      }
-         
+      numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-1);
+      } 
+   std::cout << totalBytes << std::endl;
+   std::cout << numBytes << std::endl;
+   this->_recvBuffer[numBytes] = '\0';
+   char* data = static_cast<char*>((void*)(this->_recvBuffer));
+   std::cout << data << std::endl;
    while (numBytes > 0)
       {
       totalBytes += numBytes;
@@ -180,11 +182,34 @@ int Client::clientReceive(int timeout)
          numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
          }
       }
-   if (!((numBytes == -1) && ((errno == EAGAIN)||(errno == EWOULDBLOCK))))
+   /*totalBytes = 0;
+   numBytes = 0;
+   numBytes = (*OBIO_write)(this->_bio, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-totalBytes-1);
+   while (numBytes > 0)
+      {
+      totalBytes += numBytes;
+      numBytes = (*OBIO_write)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
+      }
+   totalBytes = 0;
+   numBytes = 0;
+   numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[0]), sizeof(this->_recvBuffer)-totalBytes-1);
+   while (numBytes > 0)
+      {
+      totalBytes += numBytes;
+      numBytes = (*OBIO_read)(this->_bio, &(this->_recvBuffer[totalBytes]), sizeof(this->_recvBuffer)-totalBytes-1);
+      }*/
+   if ((numBytes < 0) && !((errno == EAGAIN)||(errno == EWOULDBLOCK)))
       {
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Receive failed!\n");
-      perror("Metric Server: Failed to receive msg!");
+      if (this->_useSSL)
+         {
+         (*OERR_print_errors_fp)(stderr);
+         }
+      else
+         {
+         perror("Metric Server: Failed to receive msg!");
+         }
       close(this->_sockfd);
       return Client::receiveFailed;
       }
@@ -196,6 +221,7 @@ int Client::clientReceive(int timeout)
       return Client::receiveFailed;
       }
    this->_recvBuffer[totalBytes] = '\0';
+   std::cout << this->_recvBuffer[0] << std::endl;
    if (TR::Options::getVerboseOption(TR_VerboseJITServer))
       TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Client msg received!\n");
    return Client::success;
@@ -233,7 +259,14 @@ int Client::clientSend(std::vector<char> sendBuffer, int timeout)
       {
       if (TR::Options::getVerboseOption(TR_VerboseJITServer))
          TR_VerboseLog::writeLineLocked(TR_Vlog_JITServer, "Metric Server: Send failed!\n");
-      perror("Metric Server: Failed to send msg!");
+      if (this->_useSSL)
+         {
+         (*OERR_print_errors_fp)(stderr);
+         }
+      else 
+         {
+         perror("Metric Server: Failed to send msg!");
+         }
       close(this->_sockfd);
       return Client::sendFailed;
       }
