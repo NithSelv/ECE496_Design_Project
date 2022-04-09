@@ -9,7 +9,7 @@
 - 7. For rossa.cpp, DLLMain.cpp, and HookedByTheJit.cpp, you will need to use the MetricServer functions defined in MetricServer.hpp to create/start/stop/destroy the MetricServer thread appropiately. Note: that it is very very similar to the listener thread for compilation requests.
 - 8. Once finished, go to the home directory and run `make all`.
 - 9. Now the build should pass and JITServer can now be run with the MetricServer thread being used to export metrics.
-- 10: The following options can be set to configure the MetricServer:
+- 10. The following options can be set to configure the MetricServer:
   `-XX:MetricServerPort=<port>` is the port that the MetricServer listens to for HTTP requests (default is 7390, must be between 1024 and 65535).
   `-XX:MetricServerTimeoutMs=<timeout>` is the timeout (in milliseconds) that the MetricServer uses for polling (Default is 100).
   `-XX:MetricServerMaxConnections=<maxconnections>` is the max number of connections that the MetricServer can handle at once (Default is 10).
