@@ -28,6 +28,7 @@ As of March, 27th, 2022, the current tasks have been implemented in the HTTP ser
 - Server can function within JITServer open-source project  
 - Server returns the desired metrics from JITServer and metrics related to itself and the host machine
 - Server can use HTTP or HTTPS to have metrics scraped
+- Instructions for integration with openj9 can be found in the README.md under `/server`
 
 ## Testing
 
