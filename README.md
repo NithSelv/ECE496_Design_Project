@@ -14,7 +14,7 @@ This can be done by allowing a Prometheus instance to send HTTP requests to the 
 
 ## Current Progress
 
-As of March, 27th, 2022, the current tasks have been implemented in the HTTP server:
+As of April, 8th, 2022, the current tasks have been implemented in the HTTP/HTTPS server:
 
 - Server can receive HTTP Requests from Prometheus
 - Server can send HTTP Responses to Prometheus
