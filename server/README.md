@@ -10,9 +10,9 @@
 - 8. Once finished, go to the home directory and run `make all`.
 - 9. Now the build should pass and JITServer can now be run with the MetricServer thread being used to export metrics.
 - 10. The following options can be set to configure the MetricServer:
-  `-XX:MetricServerPort=<port>` is the port that the MetricServer listens to for HTTP requests (default is 7390, must be between 1024 and 65535).
-  `-XX:MetricServerTimeoutMs=<timeout>` is the timeout (in milliseconds) that the MetricServer uses for polling (Default is 100).
-  `-XX:MetricServerMaxConnections=<maxconnections>` is the max number of connections that the MetricServer can handle at once (Default is 10).
-  `-XX:MetricServerHttpsPort=<httpsport>` is the port that the MetricServer listens to for HTTPS requests (default is 7391, must be between 1024 and 65535).
+  - `-XX:MetricServerPort=<port>` is the port that the MetricServer listens to for HTTP requests (default is 7390, must be between 1024 and 65535).
+  - `-XX:MetricServerTimeoutMs=<timeout>` is the timeout (in milliseconds) that the MetricServer uses for polling (Default is 100).
+  - `-XX:MetricServerMaxConnections=<maxconnections>` is the max number of connections that the MetricServer can handle at once (Default is 10).
+  - `-XX:MetricServerHttpsPort=<httpsport>` is the port that the MetricServer listens to for HTTPS requests (default is 7391, must be between 1024 and 65535).
   
   
