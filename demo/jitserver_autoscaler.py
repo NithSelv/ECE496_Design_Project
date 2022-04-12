@@ -61,24 +61,24 @@ def main(jitserver_path, prometheus_path):
    metric_ports = [7390]
    processes.append(make_jitserver_instance(jitserver_path, jit_port, metric_port, https_port))
    print("Created JITServer Instance No: "+str(len(processes)))
-   time.sleep(10)
    print("Sending original port for listening on port 2000!")
    send_new_port(2000, jit_port)
    processes.append(start_prometheus(prometheus_path))
    print("Started Prometheus instance!")
-   time.sleep(10)
+   time.sleep(5)
    signal.signal(signal.SIGINT, kill_processes)
-   while True : 
+   while True: 
       time.sleep(5)
       load = get_metrics();
       for i in range(len(metric_ports)):
          if len(load.keys()) != 0 and load[metric_ports[i]] > 1:
-            jitserver_port += 1
+            jit_port += 1
             metric_port += 2
             https_port += 2
             processes.append(make_jitserver_instance(jitserver_path, jit_port, metric_port, https_port))
             time.sleep(5)
-            print("Created JITServer Instance No: "+str(len(processes)))
+            print("Created JITServer Instance No: "+str(len(metric_ports)))
+            print("Please send some requests to port: "+str(jit_port))
             metric_ports.append(metric_port)
             send_new_port(2000, metric_port)
          if (len(load.keys()) != 0):
