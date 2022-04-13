@@ -33,12 +33,6 @@ As of April, 8th, 2022, the current tasks have been implemented in the HTTP/HTTP
 
 ## Testing
 
-The server can now obtain metrics from JITServer. In addition, as seen in the sample image below, we are able to display metrics that change over time. The computation of the metrics is done by our server for now and it is stored in a Metrics_Database object. The metrics can be scraped using HTTP or HTTPS.
+The server can now obtain metrics from JITServer. In addition, as seen in the sample image below, we are able to display metrics that change over time. The computation of the metrics is done by our server for now and it is stored in a Metrics_Database object. The metrics can be scraped using HTTP or HTTPS. In the `demo/` folder we have provided two scripts, one that fires JITServer requests and another that creates JITServer instances to handle them and divides up a load evenly amongst clients. 
 
 ![image](https://user-images.githubusercontent.com/46902009/143985492-37beb3c9-34eb-4e86-b305-19ac1f578a78.png)
-
-## Upcoming Features
-
-We plan to implement the following updates fairly soon:
-- (HIGH PRIORITY) Set up demo
-- (HIGH PRIORITY) Enhance BASH script (e.g. # of connections within 10s, execute JITServer instead of local server code)
