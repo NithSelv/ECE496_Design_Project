@@ -21,17 +21,28 @@ def recvmsg(sock, ports, loads):
          if finished:
             sock.close()
             return
+         sock.settimeout(50)
          connection, _ = sock.accept()
          x = b''
          while len(x) < 4:
-            x = x + connection.recv(4-len(x))
+            connection.settimeout(1)
+            t = connection.recv(4-len(x))
+            if len(t) == 0:
+               break
+            x = x + t
+         x = x + (4-len(x)) * b'\x00'
          new_port = struct.unpack("!i", x)[0]
          ports.append(new_port)
          loads.append(0)
          for i in range(len(ports)):
             x = b''
             while len(x) < 4:
-               x = x + connection.recv(4-len(x))
+               connection.settimeout(1)
+               t = connection.recv(4-len(x))
+               if len(t) == 0:
+                  break
+               x = x + t
+            x = x + (4 - len(x)) * b'\x00'
             loads[i] = struct.unpack("!i", x)[0]
          print("Received a new port: "+str(new_port))
          return
@@ -83,7 +94,6 @@ def main(java_path, load):
    host = socket.gethostname()
    ip = socket.gethostbyname(host)
    sock.bind((host, 2000))
-   sock.settimeout(50)
    sock.listen()
    sendreq(java_path, load, sock, ports, loads, processes)
 
